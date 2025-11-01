@@ -7,6 +7,7 @@ const {
 } = require("discord.js");
 const { Player, QueryType } = require("discord-player");
 const playdl = require("play-dl");
+const { YouTubeExtractor, SpotifyExtractor, SoundCloudExtractor } = require("@discord-player/extractor");
 
 // ----------------- Client setup ----------------- //
 const client = new Client({
@@ -33,6 +34,18 @@ playdl.getFreeClientID().then(clientID => {
   playdl.setToken({ soundcloud: { client_id: clientID } });
 });
 
+// register extractors
+(async () => {
+  try {
+    await player.extractors.register(YouTubeExtractor, {});
+    await player.extractors.register(SoundCloudExtractor, {});
+    await player.extractors.register(SpotifyExtractor, {});
+    console.log("✅ Extractors registered");
+  } catch (err) {
+    console.error("❌ Failed to register extractors:", err);
+  }
+})();
+
 // ----------------- Bot ready ----------------- //
 client.once("ready", () => {
   console.log(`✅ Đã đăng nhập thành công dưới tên ${client.user.tag}`);
@@ -56,60 +69,47 @@ client.on("messageCreate", async (message) => {
     const query = args.join(" ");
     await message.channel.send("🔍 Đang tìm kiếm bài hát...");
 
-    let result;
-    let source = "YouTube";
-
     try {
-      // phát trực tiếp từ link YouTube (video hoặc playlist)
-      const isYouTubeUrl = /(?:youtube\.com\/|youtu\.be\/)/i.test(query);
-      const isYouTubePlaylist = /[?&]list=/.test(query) || /playlist/i.test(query);
-
-      if (isYouTubeUrl) {
-        if (isYouTubePlaylist) {
-          source = "YouTube Playlist";
-          result = await player.search(query, {
-            requestedBy: message.author,
-            searchEngine: QueryType.YOUTUBE_PLAYLIST,
-          });
-        } else {
-          source = "YouTube";
-          result = await player.search(query, {
-            requestedBy: message.author,
-            searchEngine: QueryType.YOUTUBE_VIDEO,
-          });
-        }
-      }
-      // Spotify link
-      else if (playdl.sp_validate(query) === "track" || playdl.sp_validate(query) === "playlist") {
-        source = "Spotify";
-        const spType = playdl.sp_validate(query) === "playlist" ? QueryType.SPOTIFY_PLAYLIST : QueryType.SPOTIFY_SONG;
-        result = await player.search(query, { requestedBy: message.author, searchEngine: spType });
-      }
-      // SoundCloud link
-      else if (playdl.so_validate(query) === "track" || playdl.so_validate(query) === "playlist") {
-        source = "SoundCloud";
-        const soType = playdl.so_validate(query) === "playlist" ? QueryType.SOUNDCLOUD_PLAYLIST : QueryType.SOUNDCLOUD_TRACK;
-        result = await player.search(query, { requestedBy: message.author, searchEngine: soType });
-      }
-      // tìm kiếm YouTube mặc định
-      else {
-        source = "YouTube Search";
-        result = await player.search(query, {
-          requestedBy: message.author,
-          searchEngine: QueryType.AUTO,
+      // reuse existing queue if any, else create
+      let queue = player.nodes.get(message.guild.id);
+      if (!queue) {
+        queue = await player.nodes.create(message.guild, {
+          metadata: message.channel,
+          volume: 80,
+          leaveOnEnd: true,
+          leaveOnEmpty: true,
         });
       }
 
-      if (!result || !result.tracks.length) return message.reply("😢 Không tìm thấy bài hát hoặc playlist phù hợp.");
-
-      const queue = await player.nodes.create(message.guild, {
-        metadata: message.channel,
-        volume: 80,
-        leaveOnEnd: true,
-        leaveOnEmpty: true,
-      });
-
+      // connect to voice if not connected
       if (!queue.connection) await queue.connect(voice);
+
+      // detect URL types first (more reliable for direct links)
+      const isYouTubeUrl = /(?:youtube\.com\/|youtu\.be\/)/i.test(query);
+      const isYouTubePlaylist = /[?&]list=/.test(query) || /playlist/i.test(query);
+
+      let result;
+      if (isYouTubeUrl) {
+        const engine = isYouTubePlaylist ? QueryType.YOUTUBE_PLAYLIST : QueryType.YOUTUBE_VIDEO;
+        console.log(`[play] YouTube URL detected -> engine: ${engine}, query: ${query}`);
+        result = await player.search(query, { requestedBy: message.author, searchEngine: engine });
+      } else {
+        // AUTO first (search / other sources)
+        console.log(`[play] Using AUTO search for query: ${query}`);
+        result = await player.search(query, { requestedBy: message.author, searchEngine: QueryType.AUTO });
+      }
+
+      // fallback: if AUTO didn't find but it's a yt url, try explicit yt engine
+      if ((!result || !result.tracks.length) && isYouTubeUrl) {
+        const engine = isYouTubePlaylist ? QueryType.YOUTUBE_PLAYLIST : QueryType.YOUTUBE_VIDEO;
+        console.log(`[play] AUTO failed, fallback to explicit YouTube engine: ${engine}`);
+        const fallback = await player.search(query, { requestedBy: message.author, searchEngine: engine });
+        result = fallback;
+      }
+
+      if (!result || !result.tracks.length) {
+        return message.reply("😢 Không tìm thấy bài hát hoặc playlist phù hợp.");
+      }
 
       // playlist
       if (result.playlist) {
@@ -120,7 +120,7 @@ client.on("messageCreate", async (message) => {
           .setColor("#1abc9c")
           .setTitle("🎶 Đã thêm playlist")
           .setDescription(`**${result.playlist.title || "Playlist"}** — ${result.tracks.length} bài`)
-          .setFooter({ text: `Nguồn: ${source}` });
+          .setFooter({ text: `Nguồn: ${result.playlist.source ?? "YouTube"}` });
 
         return message.channel.send({ embeds: [embed] });
       }
@@ -137,7 +137,7 @@ client.on("messageCreate", async (message) => {
         .setThumbnail(track.thumbnail || track.displayThumbnail?.("default"))
         .addFields(
           { name: "⏱️ Thời lượng", value: track.duration || "Không rõ", inline: true },
-          { name: "📡 Nguồn", value: source, inline: true }
+          { name: "📡 Nguồn", value: track.source || "YouTube", inline: true }
         )
         .setFooter({ text: `Yêu cầu bởi ${message.author.tag}` });
 
