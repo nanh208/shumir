@@ -1,5 +1,6 @@
-// ================= Shumir Music Bot (Prefix version) ================= //
+// index.js — Bot phát nhạc Discord (ổn định, dùng play-dl, không cần API key)
 require("dotenv").config();
+<<<<<<< Updated upstream
 const {
   Client,
   GatewayIntentBits,
@@ -8,32 +9,37 @@ const {
 const { Player, QueryType } = require("discord-player");
 const playdl = require("play-dl");
 const { YouTubeExtractor, SpotifyExtractor, SoundCloudExtractor } = require("@discord-player/extractor");
+=======
+const fs = require("fs");
+const path = require("path");
+const { Client, GatewayIntentBits, Collection } = require("discord.js");
+const { Player } = require("discord-player");
+>>>>>>> Stashed changes
 
-// ----------------- Client setup ----------------- //
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildVoiceStates
-  ],
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildMessages
+  ]
 });
 
-const prefix = "!";
+client.commands = new Collection();
 
-// ----------------- Music player setup ----------------- //
-const player = new Player(client, {
-  ytdlOptions: {
-    quality: "highestaudio",
-    highWaterMark: 1 << 25,
-  },
-});
+// 🔧 Load tất cả lệnh
+const commandsPath = path.join(__dirname, "commands");
+if (fs.existsSync(commandsPath)) {
+  for (const file of fs.readdirSync(commandsPath).filter(f => f.endsWith(".js"))) {
+    const command = require(path.join(commandsPath, file));
+    client.commands.set(command.data?.name || command.name, command);
+  }
+}
 
-// ----------------- SoundCloud setup ----------------- //
-playdl.getFreeClientID().then(clientID => {
-  playdl.setToken({ soundcloud: { client_id: clientID } });
-});
+// 🎵 Player setup
+const player = new Player(client);
+client.player = player;
 
+<<<<<<< Updated upstream
 // register extractors
 (async () => {
   try {
@@ -47,11 +53,15 @@ playdl.getFreeClientID().then(clientID => {
 })();
 
 // ----------------- Bot ready ----------------- //
+=======
+// 🚀 Khi bot sẵn sàng
+>>>>>>> Stashed changes
 client.once("ready", () => {
-  console.log(`✅ Đã đăng nhập thành công dưới tên ${client.user.tag}`);
-  client.user.setActivity("🎶 | !help để xem lệnh");
+  console.log(`✅ Đăng nhập thành công: ${client.user.tag}`);
+  client.user.setActivity("🎶 | /play để phát nhạc");
 });
 
+<<<<<<< Updated upstream
 // ----------------- Message handler ----------------- //
 client.on("messageCreate", async (message) => {
   if (message.author.bot || !message.guild) return;
@@ -259,8 +269,26 @@ client.on("messageCreate", async (message) => {
       .setFooter({ text: "Shumir v2.0 • Dùng !play để bắt đầu phát nhạc 🎶" });
 
     return message.channel.send({ embeds: [helpEmbed] });
+=======
+// ⚡ Slash command handler
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+  const command = client.commands.get(interaction.commandName);
+  if (!command) return;
+  try {
+    await (command.execute
+      ? command.execute(interaction, client)
+      : command.run(client, interaction));
+  } catch (err) {
+    console.error(err);
+    await interaction.reply({ content: "❌ Lỗi khi chạy lệnh này!", ephemeral: true });
+>>>>>>> Stashed changes
   }
 });
 
-// ----------------- Login ----------------- //
+// 🎧 Bắt lỗi phát nhạc
+player.events.on("error", (queue, error) => console.log(`❌ Lỗi phát nhạc: ${error.message}`));
+player.events.on("playerError", (queue, error) => console.log(`🎧 Player lỗi: ${error.message}`));
+
+// 🔑 Đăng nhập bot
 client.login(process.env.TOKEN);
