@@ -143,10 +143,43 @@ client.on("messageCreate", async (message) => {
 
       if (!queue.connection) await queue.connect(voice);
 
-      const result = await player.search(query, {
-          requestedBy: message.author,
-          searchEngine: QueryType.AUTO
-      });
+      // --- SỬA LỖI: TÌM KIẾM CHUYÊN BIỆT THAY VÌ AUTO ---
+      let result;
+
+      // Ưu tiên tìm kiếm link trực tiếp bằng play-dl (cho YouTube/SoundCloud)
+      if (query.startsWith("https://")) {
+          try {
+              // Kiểm tra xem link có phải SoundCloud không
+              if (playdl.soundcloud_url(query)) {
+                  result = await player.search(query, {
+                      requestedBy: message.author,
+                      searchEngine: QueryType.SOUNDCLOUD // Chỉ định rõ SoundCloud
+                  });
+              } 
+              // Nếu không phải SC, giả định là YouTube
+              else {
+                  result = await player.search(query, {
+                      requestedBy: message.author,
+                      searchEngine: QueryType.YOUTUBE_VIDEO // Chỉ định rõ YouTube
+                  });
+      _        }
+          } catch (e) {
+              console.error("Lỗi khi tìm link trực tiếp:", e);
+              // Nếu lỗi (ví dụ link playlist YT), thử lại bằng AUTO
+              result = await player.search(query, {
+                  requestedBy: message.author,
+                  searchEngine: QueryType.AUTO
+              });
+          }
+      } 
+      // Nếu không phải link (là tên bài hát), dùng tìm kiếm YouTube
+      else {
+          result = await player.search(query, {
+              requestedBy: message.author,
+              searchEngine: QueryType.YOUTUBE_SEARCH // Chỉ định rõ tìm kiếm tên
+          });
+      }
+      // --- KẾT THÚC SỬA LỖI ---
       
       if (loadingMessage) {
           await loadingMessage.delete();
