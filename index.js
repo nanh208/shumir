@@ -144,43 +144,10 @@ client.on("messageCreate", async (message) => {
       if (!queue.connection) await queue.connect(voice);
 
       // --- SỬA LỖI: TÌM KIẾM CHUYÊN BIỆT THAY VÌ AUTO ---
-let result;
-
-      if (query.startsWith("https://")) {
-          try {
-              // Dùng hàm validate (bất đồng bộ) để kiểm tra loại link
-              const validation = await playdl.validate(query); 
-
-              // Nếu là link SoundCloud (bắt đầu bằng 'so_')
-              if (validation && validation.startsWith('so_')) {
-                  result = await player.search(query, {
-                      requestedBy: message.author,
-                      searchEngine: QueryType.SOUNDCLOUD
-                  });
-              } 
-              // Với các link khác (YouTube, Spotify...), cứ để AUTO xử lý
-              else {
-                  result = await player.search(query, {
-                      requestedBy: message.author,
-                      searchEngine: QueryType.AUTO
-                  });
-              }
-          } catch (e) {
-              console.error("Lỗi khi validate hoặc tìm link trực tiếp:", e);
-              // Nếu lỗi, thử lại bằng AUTO
-              result = await player.search(query, {
-                  requestedBy: message.author,
-                  searchEngine: QueryType.AUTO
-              });
-          }
-      } 
-      // Nếu không phải link (là tên bài hát), dùng tìm kiếm YouTube
-      else {
-          result = await player.search(query, {
-              requestedBy: message.author,
-              searchEngine: QueryType.YOUTUBE_SEARCH // Chỉ định rõ tìm kiếm tên
-          });
-      }
+const result = await player.search(query, {
+          requestedBy: message.author,
+          searchEngine: QueryType.AUTO
+      });
       // --- KẾT THÚC SỬA LỖI ---
       
       if (loadingMessage) {
