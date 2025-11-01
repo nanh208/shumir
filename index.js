@@ -7,7 +7,6 @@ const {
 } = require("discord.js");
 const { Player, QueryType } = require("discord-player");
 const playdl = require("play-dl");
-const { YouTubeExtractor, SpotifyExtractor, SoundCloudExtractor } = require("@discord-player/extractor");
 
 // ----------------- Client setup ----------------- //
 const client = new Client({
@@ -34,16 +33,13 @@ playdl.getFreeClientID().then(clientID => {
   playdl.setToken({ soundcloud: { client_id: clientID } });
 });
 
-// register extractors
+// ----------------- Extractors setup ----------------- //
+const { YouTubeExtractor, SpotifyExtractor, SoundCloudExtractor } = require("@discord-player/extractor");
+
 (async () => {
-  try {
-    await player.extractors.register(YouTubeExtractor, {});
-    await player.extractors.register(SoundCloudExtractor, {});
-    await player.extractors.register(SpotifyExtractor, {});
-    console.log("✅ Extractors registered");
-  } catch (err) {
-    console.error("❌ Failed to register extractors:", err);
-  }
+  await player.extractors.register(YouTubeExtractor, {});
+  await player.extractors.register(SoundCloudExtractor, {});
+  await player.extractors.register(SpotifyExtractor, {});
 })();
 
 // ----------------- Bot ready ----------------- //
