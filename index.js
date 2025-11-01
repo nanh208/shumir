@@ -5,7 +5,29 @@ const { Client, GatewayIntentBits, EmbedBuilder, Collection } = require("discord
 const { Player, QueryType, Track } = require("discord-player");
 const playdl = require("play-dl");
 const { DefaultExtractors } = require("@discord-player/extractor");
+// --- SỬA LỖI: GỘP CẤU HÌNH YOUTUBE VÀ SOUNDCLOUD ---
+(async () => {
+    try {
+        // Lấy SoundCloud ID
+        const soundcloud_client_id = await playdl.getFreeClientID();
 
+        // Set token cho CẢ HAI cùng một lúc
+        await playdl.setToken({
+            soundcloud: {
+                client_id: soundcloud_client_id
+            },
+            youtube: {
+                cookie: process.env.YOUTUBE_COOKIE
+            }
+        });
+        
+        console.log("✅ Đã set YouTube Cookie và SoundCloud Client ID.");
+        
+    } catch (e) {
+        console.error("❌ Lỗi khi set Token (Cookie/SoundCloud):", e.message);
+    }
+})();
+// --- KẾT THÚC SỬA LỖI ---
 // ----------------- Client setup ----------------- //
 const client = new Client({
   intents: [
@@ -37,12 +59,6 @@ const player = new Player(client, {
     console.error("❌ Failed to register extractors:", err);
   }
 })();
-
-// ----------------- SoundCloud setup ----------------- //
-playdl.getFreeClientID().then(clientID => {
-  playdl.setToken({ soundcloud: { client_id: clientID } });
-  console.log("✅ SoundCloud Client ID được thiết lập.");
-});
 
 // ----------------- Player Event Handlers ----------------- //
 player.events.on('playerStart', (queue, track) => {
@@ -255,7 +271,7 @@ client.on("messageCreate", async (message) => {
       .addFields(
         { name: "Discord API", value: "✅ Kết nối ổn định" },
         { name: "play-dl", value: playdl.is_expired() ? "⚠️ Token YouTube cần làm mới!" : "✅ Hoạt động tốt" },
-        { name:s: "Nguồn phát", value: "YouTube / Spotify / SoundCloud" }
+        { name: "Nguồn phát", value: "YouTube / Spotify / SoundCloud" }
       );
     message.channel.send({ embeds: [testEmbed] });
   }
