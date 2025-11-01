@@ -28,6 +28,11 @@ const player = new Player(client, {
   },
 });
 
+// ----------------- SoundCloud setup ----------------- //
+playdl.getFreeClientID().then(clientID => {
+  playdl.setToken({ soundcloud: { client_id: clientID } });
+});
+
 // ----------------- Bot ready ----------------- //
 client.once("ready", () => {
   console.log(`✅ Đã đăng nhập thành công dưới tên ${client.user.tag}`);
@@ -45,10 +50,8 @@ client.on("messageCreate", async (message) => {
 
   // ----------------- !play ----------------- //
   if (command === "play") {
-    if (!voice)
-      return message.reply("❌ Bạn cần vào kênh voice trước!");
-    if (!args[0])
-      return message.reply("⚠️ Vui lòng nhập tên hoặc link bài hát!");
+    if (!voice) return message.reply("❌ Bạn cần vào kênh voice trước!");
+    if (!args[0]) return message.reply("⚠️ Vui lòng nhập tên hoặc link bài hát!");
 
     const query = args.join(" ");
     await message.channel.send("🔍 Đang tìm kiếm bài hát...");
@@ -57,36 +60,39 @@ client.on("messageCreate", async (message) => {
     let source = "YouTube";
 
     try {
-      // --- Tự phát hiện link ---
-      if (playdl.yt_validate(query) === "video" || playdl.yt_validate(query) === "playlist") {
-        source = "YouTube";
-        result = await player.search(query, {
-          requestedBy: message.author,
-          searchEngine:
-            playdl.yt_validate(query) === "playlist"
-              ? QueryType.YOUTUBE_PLAYLIST
-              : QueryType.YOUTUBE_VIDEO,
-        });
-      } else if (playdl.sp_validate(query) === "track" || playdl.sp_validate(query) === "playlist") {
+      // phát trực tiếp từ link YouTube (video hoặc playlist)
+      const isYouTubeUrl = /(?:youtube\.com\/|youtu\.be\/)/i.test(query);
+      const isYouTubePlaylist = /[?&]list=/.test(query) || /playlist/i.test(query);
+
+      if (isYouTubeUrl) {
+        if (isYouTubePlaylist) {
+          source = "YouTube Playlist";
+          result = await player.search(query, {
+            requestedBy: message.author,
+            searchEngine: QueryType.YOUTUBE_PLAYLIST,
+          });
+        } else {
+          source = "YouTube";
+          result = await player.search(query, {
+            requestedBy: message.author,
+            searchEngine: QueryType.YOUTUBE_VIDEO,
+          });
+        }
+      }
+      // Spotify link
+      else if (playdl.sp_validate(query) === "track" || playdl.sp_validate(query) === "playlist") {
         source = "Spotify";
-        result = await player.search(query, {
-          requestedBy: message.author,
-          searchEngine:
-            playdl.sp_validate(query) === "playlist"
-              ? QueryType.SPOTIFY_PLAYLIST
-              : QueryType.SPOTIFY_SONG,
-        });
-      } else if (playdl.so_validate(query) === "track" || playdl.so_validate(query) === "playlist") {
+        const spType = playdl.sp_validate(query) === "playlist" ? QueryType.SPOTIFY_PLAYLIST : QueryType.SPOTIFY_SONG;
+        result = await player.search(query, { requestedBy: message.author, searchEngine: spType });
+      }
+      // SoundCloud link
+      else if (playdl.so_validate(query) === "track" || playdl.so_validate(query) === "playlist") {
         source = "SoundCloud";
-        result = await player.search(query, {
-          requestedBy: message.author,
-          searchEngine:
-            playdl.so_validate(query) === "playlist"
-              ? QueryType.SOUNDCLOUD_PLAYLIST
-              : QueryType.SOUNDCLOUD_TRACK,
-        });
-      } else {
-        // Nếu không phải link
+        const soType = playdl.so_validate(query) === "playlist" ? QueryType.SOUNDCLOUD_PLAYLIST : QueryType.SOUNDCLOUD_TRACK;
+        result = await player.search(query, { requestedBy: message.author, searchEngine: soType });
+      }
+      // tìm kiếm YouTube mặc định
+      else {
         source = "YouTube Search";
         result = await player.search(query, {
           requestedBy: message.author,
@@ -94,8 +100,7 @@ client.on("messageCreate", async (message) => {
         });
       }
 
-      if (!result || !result.tracks.length)
-        return message.reply("😢 Không tìm thấy bài hát hoặc playlist phù hợp.");
+      if (!result || !result.tracks.length) return message.reply("😢 Không tìm thấy bài hát hoặc playlist phù hợp.");
 
       const queue = await player.nodes.create(message.guild, {
         metadata: message.channel,
@@ -106,36 +111,40 @@ client.on("messageCreate", async (message) => {
 
       if (!queue.connection) await queue.connect(voice);
 
+      // playlist
       if (result.playlist) {
         queue.addTrack(result.tracks);
         if (!queue.isPlaying()) await queue.node.play();
+
         const embed = new EmbedBuilder()
           .setColor("#1abc9c")
           .setTitle("🎶 Đã thêm playlist")
-          .setDescription(`**${result.playlist.title}** (${result.tracks.length} bài)`)
+          .setDescription(`**${result.playlist.title || "Playlist"}** — ${result.tracks.length} bài`)
           .setFooter({ text: `Nguồn: ${source}` });
-        return message.channel.send({ embeds: [embed] });
-      } else {
-        const track = result.tracks[0];
-        queue.addTrack(track);
-        if (!queue.isPlaying()) await queue.node.play();
-
-        const embed = new EmbedBuilder()
-          .setColor("#00bfff")
-          .setTitle("🎧 Đang phát")
-          .setDescription(`[${track.title}](${track.url})`)
-          .setThumbnail(track.thumbnail)
-          .addFields(
-            { name: "⏱️ Thời lượng", value: track.duration, inline: true },
-            { name: "📡 Nguồn", value: source, inline: true }
-          )
-          .setFooter({ text: `Yêu cầu bởi ${message.author.tag}` });
 
         return message.channel.send({ embeds: [embed] });
       }
+
+      // single track
+      const track = result.tracks[0];
+      queue.addTrack(track);
+      if (!queue.isPlaying()) await queue.node.play();
+
+      const embed = new EmbedBuilder()
+        .setColor("#00bfff")
+        .setTitle("🎧 Đang phát")
+        .setDescription(`[${track.title}](${track.url})`)
+        .setThumbnail(track.thumbnail || track.displayThumbnail?.("default"))
+        .addFields(
+          { name: "⏱️ Thời lượng", value: track.duration || "Không rõ", inline: true },
+          { name: "📡 Nguồn", value: source, inline: true }
+        )
+        .setFooter({ text: `Yêu cầu bởi ${message.author.tag}` });
+
+      return message.channel.send({ embeds: [embed] });
     } catch (err) {
       console.error(err);
-      message.reply("⚠️ Có lỗi xảy ra khi phát nhạc!");
+      return message.reply("⚠️ Có lỗi xảy ra khi phát nhạc!");
     }
   }
 
@@ -151,8 +160,8 @@ client.on("messageCreate", async (message) => {
   // ----------------- !resume ----------------- //
   else if (command === "resume") {
     const queue = player.nodes.get(message.guild.id);
-    if (!queue)
-      return message.reply("⚠️ Không có bài hát nào trong hàng đợi.");
+    if (!queue) return message.reply("⚠️ Không có bài hát nào trong hàng đợi.");
+
     queue.node.resume();
     message.reply("▶️ Tiếp tục phát nhạc.");
   }
