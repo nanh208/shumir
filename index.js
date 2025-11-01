@@ -2,7 +2,7 @@ require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const { Client, GatewayIntentBits, EmbedBuilder, Collection } = require("discord.js");
-const { Player, QueryType } = require("discord-player");
+const { Player, QueryType, Track } = require("discord-player");
 const playdl = require("play-dl");
 const { DefaultExtractors } = require("@discord-player/extractor");
 
@@ -17,6 +17,8 @@ const client = new Client({
 });
 
 const prefix = "!";
+// --- THÊM MỚI: ID máy chủ (Guild) cụ thể của bạn ---
+const GUILD_ID = "1308052869559222272"; 
 
 // ----------------- Music player setup ----------------- //
 const player = new Player(client, {
@@ -39,17 +41,54 @@ const player = new Player(client, {
 // ----------------- SoundCloud setup ----------------- //
 playdl.getFreeClientID().then(clientID => {
   playdl.setToken({ soundcloud: { client_id: clientID } });
+  console.log("✅ SoundCloud Client ID được thiết lập.");
+});
+
+// ----------------- Player Event Handlers ----------------- //
+player.events.on('playerStart', (queue, track) => {
+    const channel = queue.metadata;
+    channel.send(`🎵 **Bắt đầu phát:** [${track.title}](${track.url})`);
+});
+
+player.events.on('error', (queue, error) => {
+    console.error(`[ERROR] Player Error in guild ${queue.guild.id}:`, error);
+    if (queue.metadata) {
+        queue.metadata.send(`❌ Lỗi Player: Đã xảy ra sự cố khi phát nhạc. Vui lòng thử lại. Lỗi: \`${error.message}\``);
+    }
+});
+
+player.events.on('connectionError', (queue, error) => {
+    console.error(`[ERROR] Connection Error in guild ${queue.guild.id}:`, error);
+    if (queue.metadata) {
+        queue.metadata.send(`❌ Lỗi Kết nối: Không thể kết nối hoặc duy trì kết nối voice. Lỗi: \`${error.message}\``);
+    }
+});
+
+player.events.on('noFilter', (queue, filter) => {
+    if (queue.metadata) {
+        queue.metadata.send(`⚠️ Lỗi Filter: Không áp dụng được bộ lọc \`${filter}\` cho bài hát này.`);
+    }
 });
 
 // ----------------- Bot ready ----------------- //
 client.once("ready", () => {
   console.log(`✅ Đã đăng nhập thành công dưới tên ${client.user.tag}`);
+  // --- CẬP NHẬT: Thông báo rõ bot đang chạy cho Guild nào ---
+  console.log(`📡 Bot đang được cấu hình để chỉ chạy trên GUILD: ${GUILD_ID}`);
   client.user.setActivity("🎶 | !help để xem lệnh");
 });
 
 // ----------------- Message handler ----------------- //
 client.on("messageCreate", async (message) => {
   if (message.author.bot || !message.guild) return;
+
+  // --- THÊM MỚI: Chỉ cho phép bot hoạt động ở máy chủ (GUILD) cụ thể ---
+  if (message.guild.id !== GUILD_ID) {
+      // Bot sẽ im lặng bỏ qua tất cả tin nhắn từ các server khác
+      return; 
+  }
+  // --- KẾT THÚC THÊM MỚI ---
+
   if (!message.content.startsWith(prefix)) return;
 
   const args = message.content.slice(prefix.length).trim().split(/ +/);
@@ -62,10 +101,16 @@ client.on("messageCreate", async (message) => {
     if (!args[0]) return message.reply("⚠️ Vui lòng nhập tên hoặc link bài hát!");
 
     const query = args.join(" ");
-    await message.channel.send("🔍 Đang tìm kiếm bài hát...");
+    
+    let loadingMessage;
+    try {
+        loadingMessage = await message.channel.send("🔍 Đang tìm kiếm bài hát...");
+    } catch (e) {
+        console.error("Failed to send loading message:", e);
+    }
+
 
     try {
-      // reuse existing queue if any, else create
       let queue = player.nodes.get(message.guild.id);
       if (!queue) {
         queue = await player.nodes.create(message.guild, {
@@ -73,31 +118,22 @@ client.on("messageCreate", async (message) => {
           volume: 80,
           leaveOnEnd: true,
           leaveOnEmpty: true,
+          ytdlOptions: {
+              quality: "highestaudio",
+              highWaterMark: 1 << 25,
+          },
         });
       }
 
-      // connect to voice if not connected
       if (!queue.connection) await queue.connect(voice);
 
-      // detect URL types first
-      const isYouTubeUrl = /(?:youtube\.com\/|youtu\.be\/)/i.test(query);
-      const isYouTubePlaylist = /[?&]list=/.test(query) || /playlist/i.test(query);
-
-      let result;
-      if (isYouTubeUrl) {
-        const engine = isYouTubePlaylist ? QueryType.YOUTUBE_PLAYLIST : QueryType.YOUTUBE_VIDEO;
-        console.log(`[play] YouTube URL detected -> engine: ${engine}, query: ${query}`);
-        result = await player.search(query, { requestedBy: message.author, searchEngine: engine });
-      } else {
-        console.log(`[play] Using AUTO search for query: ${query}`);
-        result = await player.search(query, { requestedBy: message.author, searchEngine: QueryType.AUTO });
-      }
-
-      if ((!result || !result.tracks.length) && isYouTubeUrl) {
-        const engine = isYouTubePlaylist ? QueryType.YOUTUBE_PLAYLIST : QueryType.YOUTUBE_VIDEO;
-        console.log(`[play] AUTO failed, fallback to explicit YouTube engine: ${engine}`);
-        const fallback = await player.search(query, { requestedBy: message.author, searchEngine: engine });
-        result = fallback;
+      const result = await player.search(query, {
+          requestedBy: message.author,
+          searchEngine: QueryType.AUTO
+      });
+      
+      if (loadingMessage) {
+          await loadingMessage.delete();
       }
 
       if (!result || !result.tracks.length) {
@@ -121,7 +157,15 @@ client.on("messageCreate", async (message) => {
       // single track
       const track = result.tracks[0];
       queue.addTrack(track);
-      if (!queue.isPlaying()) await queue.node.play();
+      if (!queue.isPlaying()) await queue.node.play(); 
+      else {
+          const addedEmbed = new EmbedBuilder()
+            .setColor("#f1c40f")
+            .setTitle("➕ Đã thêm vào hàng đợi")
+            .setDescription(`[${track.title}](${track.url})`)
+            .setFooter({ text: `Vị trí: ${queue.tracks.size}` });
+          return message.channel.send({ embeds: [addedEmbed] });
+      }
 
       const embed = new EmbedBuilder()
         .setColor("#00bfff")
@@ -134,14 +178,16 @@ client.on("messageCreate", async (message) => {
         )
         .setFooter({ text: `Yêu cầu bởi ${message.author.tag}` });
 
-      return message.channel.send({ embeds: [embed] });
     } catch (err) {
-      console.error(err);
-      return message.reply("⚠️ Có lỗi xảy ra khi phát nhạc!");
+      console.error("[PLAY COMMAND ERROR]:", err);
+      if (loadingMessage) {
+          await loadingMessage.delete();
+      }
+      return message.reply(`⚠️ Có lỗi xảy ra khi phát nhạc! Hãy kiểm tra console để biết chi tiết. Lỗi: \`${err.message}\``);
     }
   }
 
-  // ----------------- Các lệnh khác ----------------- //
+  // ----------------- Các lệnh khác giữ nguyên ----------------- //
   else if (command === "pause") {
     const queue = player.nodes.get(message.guild.id);
     if (!queue || !queue.isPlaying())
@@ -209,7 +255,7 @@ client.on("messageCreate", async (message) => {
       .addFields(
         { name: "Discord API", value: "✅ Kết nối ổn định" },
         { name: "play-dl", value: playdl.is_expired() ? "⚠️ Token YouTube cần làm mới!" : "✅ Hoạt động tốt" },
-        { name: "Nguồn phát", value: "YouTube / Spotify / SoundCloud" }
+        { name:s: "Nguồn phát", value: "YouTube / Spotify / SoundCloud" }
       );
     message.channel.send({ embeds: [testEmbed] });
   }
