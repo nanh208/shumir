@@ -1,121 +1,154 @@
 // events/messageCreate.js
-const fs = require('fs');
-const { Events } = require('discord.js');
-const dictionary = require('../dictionary.js');
-const dictionaryArray = Array.from(dictionary);
+const fs = require("fs");
+const path = require("path");
+const { Events } = require("discord.js");
+const dictionary = require("../dictionary.js"); // Set chứa các từ hợp lệ
+const { activeGames, saveGames } = require("../data/activeGames.js");
+
 const prefix = "!";
 
-// Load điểm từ file
+// ======= File điểm =======
+const scoresPath = path.resolve(__dirname, "../data/scores.json");
 let scores = {};
-try {
-    scores = JSON.parse(fs.readFileSync('./scores.json', 'utf8'));
-} catch {
+if (fs.existsSync(scoresPath)) {
+  try {
+    scores = JSON.parse(fs.readFileSync(scoresPath, "utf8"));
+  } catch {
+    console.error("⚠️ Lỗi đọc scores.json — khởi tạo mới.");
     scores = {};
+  }
+}
+function saveScores() {
+  fs.writeFileSync(scoresPath, JSON.stringify(scores, null, 2));
 }
 
-const saveScores = () => {
-    fs.writeFileSync('./scores.json', JSON.stringify(scores, null, 2));
-};
-
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
+// ======= Bắt đầu module =======
 module.exports = {
-    name: Events.MessageCreate,
-    async execute(message, gameStates) {
-        if (message.author.bot) return;
+  name: Events.MessageCreate,
+  async execute(message, gameStates) {
+    if (message.author.bot || !message.guild) return;
+    const guildId = message.guild.id;
 
-        // 1. Xử lý lệnh !play, !stop
-        if (message.content.startsWith(prefix)) {
-            const args = message.content.slice(prefix.length).trim().split(/ +/);
-            const command = args.shift().toLowerCase();
+    // ========== Lệnh !play / !stop ==========
+    if (message.content.startsWith(prefix)) {
+      const args = message.content.slice(prefix.length).trim().split(/ +/);
+      const command = args.shift()?.toLowerCase();
 
-            if (command === "play") {
-                if (gameStates.has(message.channel.id))
-                    return message.reply("Game đang diễn ra rồi! Dùng `!stop` để dừng.");
+      // ----- Bắt đầu -----
+      if (command === "play") {
+        if (gameStates.has(message.channel.id))
+          return message.reply("⚠️ Game đang diễn ra rồi! Dùng `!stop` để dừng trước.");
 
-                const randomWord = dictionaryArray[Math.floor(Math.random() * dictionaryArray.length)];
-                const lastSyllable = randomWord.split(' ').pop();
+        // Lấy ngẫu nhiên 1 từ trong dictionary
+        const allWords = Array.from(dictionary);
+        if (allWords.length === 0)
+          return message.reply("⚠️ Không có từ nào trong từ điển để bắt đầu game.");
 
-                gameStates.set(message.channel.id, {
-                    lastSyllable,
-                    lastUser: message.client.user.id,
-                    usedWords: new Set([randomWord])
-                });
+        const randomWord = allWords[Math.floor(Math.random() * allWords.length)];
 
-                return message.channel.send(
-                    `🎉 **Game nối từ bắt đầu!**\nBot ra từ: **${randomWord}**\n\nLượt tiếp theo, nối từ bắt đầu bằng: **${lastSyllable}**`
-                );
-            }
+        // Tạo game state
+        gameStates.set(message.channel.id, {
+          lastWord: randomWord,
+          lastUser: message.client.user.id,
+          usedWords: new Set([randomWord]),
+        });
 
-            if (command === "stop") {
-                if (!gameStates.has(message.channel.id))
-                    return message.reply("Không có game nào đang chạy để dừng.");
-                gameStates.delete(message.channel.id);
-                return message.reply("🏁 **Game đã kết thúc!** Gõ `!play` để bắt đầu ván mới.");
-            }
+        activeGames[message.channel.id] = {
+          lastWord: randomWord,
+          lastPlayer: message.client.user.id,
+          usedWords: [randomWord],
+          started: true,
+        };
+        saveGames();
+
+        return message.channel.send(
+          `🎮 **Bắt đầu trò chơi Nối Từ!**\nTừ đầu: **${randomWord}**\n👉 Nối tiếp bằng từ bắt đầu với: **${randomWord.split(/\s+/).pop()}**`
+        );
+      }
+
+      // ----- Dừng game -----
+      if (command === "stop") {
+        if (!gameStates.has(message.channel.id))
+          return message.reply("❌ Không có game nào đang chạy để dừng.");
+
+        gameStates.delete(message.channel.id);
+        delete activeGames[message.channel.id];
+        saveGames();
+
+        return message.reply("🏁 **Game đã kết thúc!** Gõ `!play` để bắt đầu ván mới.");
+      }
+
+      return;
+    }
+
+    // ========== Xử lý khi có người chơi ==========
+    const state = gameStates.get(message.channel.id);
+    if (!state) return; // không có game đang chạy
+
+    if (message.author.id === state.lastUser)
+      return message.reply("⏳ Bạn vừa nối rồi, chờ người khác đi nào!");
+
+    const newWord = message.content.trim().toLowerCase();
+    if (!newWord) return;
+
+    // Kiểm tra tồn tại trong từ điển
+    if (!dictionary.has(newWord))
+      return message.reply(`❌ Từ **${newWord}** không có trong từ điển!`);
+
+    // Kiểm tra trùng
+    if (state.usedWords.has(newWord))
+      return message.reply(`❌ Từ **${newWord}** đã được dùng rồi!`);
+
+    // ====== Kiểm tra logic nối từ ======
+    const lastPart = state.lastWord.split(/\s+/).pop(); // từ cuối của cụm trước
+    const firstPart = newWord.split(/\s+/)[0]; // từ đầu của cụm mới
+
+    if (firstPart !== lastPart) {
+      return message.reply(`❌ Sai rồi! Từ mới phải **bắt đầu bằng "${lastPart}"**.`);
+    }
+
+    // ====== Nếu hợp lệ ======
+    state.lastWord = newWord;
+    state.lastUser = message.author.id;
+    state.usedWords.add(newWord);
+
+    activeGames[message.channel.id] = {
+      lastWord: newWord,
+      lastPlayer: message.author.id,
+      usedWords: Array.from(state.usedWords),
+      started: true,
+    };
+    saveGames();
+
+    // Kiểm tra xem còn từ nối được không
+    let canContinue = false;
+    for (const dictWord of dictionary) {
+      if (!state.usedWords.has(dictWord)) {
+        const nextFirst = dictWord.split(/\s+/)[0];
+        if (nextFirst === newWord.split(/\s+/).pop()) {
+          canContinue = true;
+          break;
         }
+      }
+    }
 
-        // 2. Xử lý lượt nối từ
-        else {
-            const state = gameStates.get(message.channel.id);
-            if (!state) return;
+    if (!canContinue) {
+      // Người chơi thắng
+      if (!scores[guildId]) scores[guildId] = {};
+      scores[guildId][message.author.id] = (scores[guildId][message.author.id] || 0) + 1;
+      saveScores();
 
-            if (message.author.id === state.lastUser)
-                return message.reply("Bạn vừa trả lời lượt trước rồi, chờ người khác nha!");
+      gameStates.delete(message.channel.id);
+      delete activeGames[message.channel.id];
+      saveGames();
 
-            const newWord = message.content.trim().toLowerCase();
-            if (newWord === "") return;
+      return message.channel.send(
+        `🏆 **${message.author.username}** thắng ván này với từ cuối: **${newWord}**!\n🎉 Nhận được **+1 điểm**!\n💬 Gõ \`!play\` để bắt đầu ván mới.`
+      );
+    }
 
-            const firstSyllable = newWord.split(' ')[0];
-
-            if (firstSyllable !== state.lastSyllable) {
-                await message.react('❌');
-                return message.reply(`Sai rồi! Cần bắt đầu bằng \`${state.lastSyllable}\`.`);
-            }
-
-            if (!dictionary.has(newWord)) {
-                await message.react('❌');
-                return message.reply(`Từ \`${newWord}\` không có trong từ điển!`);
-            }
-
-            if (state.usedWords.has(newWord)) {
-                await message.react('❌');
-                return message.reply(`Từ \`${newWord}\` đã được dùng rồi!`);
-            }
-
-            // Nếu đúng
-            await message.react('✅');
-            await sleep(1500);
-
-            const newLastSyllable = newWord.split(' ').pop();
-            state.lastSyllable = newLastSyllable;
-            state.lastUser = message.author.id;
-            state.usedWords.add(newWord);
-
-            // Kiểm tra còn từ để nối không
-            let canContinue = false;
-            for (const dictWord of dictionary) {
-                if (!state.usedWords.has(dictWord) && dictWord.split(' ')[0] === newLastSyllable) {
-                    canContinue = true;
-                    break;
-                }
-            }
-
-            if (!canContinue) {
-                // --- Thắng game ---
-                const winner = message.author;
-                scores[winner.id] = (scores[winner.id] || 0) + 1;
-                saveScores();
-
-                message.channel.send(
-                    `🏆 **${newWord}**! Hết từ để nối rồi!\n**${winner.username}** thắng và nhận được **+1 điểm!**`
-                );
-
-                gameStates.delete(message.channel.id);
-                message.channel.send("--- Gõ `!play` để bắt đầu vòng mới! ---");
-            } else {
-                message.channel.send(`Lượt tiếp theo: **${newLastSyllable}**`);
-            }
-        }
-    },
+    // Còn nối được → tiếp tục
+    const nextHint = newWord.split(/\s+/).pop();
+    return message.channel.send(`✅ Hợp lệ! Tiếp tục nối bằng từ bắt đầu với: **${nextHint}**`);
+  },
 };

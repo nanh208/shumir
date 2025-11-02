@@ -1,0 +1,22 @@
+{
+  "scores": {
+    "1429821070889975975": 1
+  },
+  "activeGames": {
+    "123456789012345678": {
+      "game": "rps",
+      "state": {
+        "score": 2,
+        "round": 5
+      }
+    },
+    "987654321098765432": {
+      "game": "wordguess",
+      "state": {
+        "word": "banana",
+        "attempts": 3
+      }
+    }
+  },
+  "backupTime": "2025-11-02T18-35-40-831Z"
+}

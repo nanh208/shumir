@@ -69,7 +69,9 @@ module.exports = {
           "`/memorygame [length]` — Ghi nhớ chuỗi emoji\n" +
           "`/maze` — Mê cung 5x5\n" +
           "`/codebreaker [tries]` — Giải mã 4 chữ số\n" +
-          "`/endgame` — Thoát mini-game đang chơi\n",
+          "`/endgame` — Thoát mini-game đang chơi\n"+
+            "`/bxh` — Xem bảng xếp hạng server hiện tại\n" +
+    "`!suabxh <add|remove|set> <@user> <điểm>` — Thêm / trừ / đặt lại điểm (admin hoặc chủ bot)\n",
         inline: false,
       },
       {
@@ -82,6 +84,9 @@ module.exports = {
         inline: false,
       }
     );
+if (command.category !== "admin") {
+   // addFields help
+}
 
     embed.setFooter({
       text: "📘 Gõ /help <tên_lệnh> để xem hướng dẫn chi tiết từng lệnh — Shumir Bot™",
