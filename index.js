@@ -92,22 +92,26 @@ client.on(Events.InteractionCreate, async interaction => {
   if (!command) return;
 
   try {
+    // ⚡ Giữ phiên tương tác (tránh lỗi Unknown Interaction)
+    await interaction.deferReply({ ephemeral: false });
+
     if (command.category === "games") {
       await command.execute(interaction, gameStates);
     } else {
       await command.execute(interaction);
     }
   } catch (error) {
-    console.error(error);
+    console.error("❌ Lỗi khi xử lý lệnh:", error);
     const embed = new EmbedBuilder()
       .setColor("Red")
       .setTitle("❌ Lỗi khi chạy lệnh!")
       .setDescription("Có vẻ Shumir hơi bối rối... bạn thử lại nhé!");
 
-    if (interaction.replied || interaction.deferred) {
-      await interaction.followUp({ embeds: [embed], ephemeral: true });
-    } else {
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+    // Nếu interaction còn hợp lệ thì chỉnh sửa reply hiện tại
+    try {
+      await interaction.editReply({ embeds: [embed] });
+    } catch {
+      console.log("⚠️ Interaction đã hết hạn, bỏ qua lỗi.");
     }
   }
 });
