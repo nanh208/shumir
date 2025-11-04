@@ -15,11 +15,11 @@ module.exports = {
         scores = JSON.parse(fs.readFileSync(scoresFile, "utf8"));
       }
     } catch (err) {
-      console.error("Lỗi đọc scores.json:", err);
+      console.error("⚠️ Lỗi đọc scores.json:", err);
       return interaction.reply("⚠️ Không thể đọc dữ liệu điểm!");
     }
 
-    const guildId = interaction.guild.id;
+    const guildId = interaction.guild.id.toString();
     const guildScores = scores[guildId] || {};
 
     const sorted = Object.entries(guildScores).sort((a, b) => b[1] - a[1]);
@@ -28,14 +28,18 @@ module.exports = {
 
     const top = sorted
       .slice(0, 10)
-      .map(([id, score], i) => `**${i + 1}.** <@${id}> — 🏆 **${score} điểm**`)
+      .map(([id, score], i) => {
+        const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "🏆";
+        return `${medal} **${i + 1}.** <@${id}> — **${score} điểm**`;
+      })
       .join("\n");
 
     const embed = new EmbedBuilder()
-      .setTitle(`🏆 BẢNG XẾP HẠNG SERVER: ${interaction.guild.name}`)
+      .setTitle(`📊 BẢNG XẾP HẠNG SERVER: ${interaction.guild.name}`)
       .setDescription(top)
-      .setColor("Gold")
+      .setColor("#FFD700") // màu vàng gold
       .setThumbnail(interaction.guild.iconURL({ dynamic: true }))
+      .setFooter({ text: "🏅 Hãy tiếp tục chơi để leo BXH!" })
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed] });

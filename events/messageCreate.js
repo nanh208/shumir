@@ -132,20 +132,34 @@ module.exports = {
       }
     }
 
-    if (!canContinue) {
-      // Người chơi thắng
-      if (!scores[guildId]) scores[guildId] = {};
-      scores[guildId][message.author.id] = (scores[guildId][message.author.id] || 0) + 1;
-      saveScores();
+  // ====== Nếu không còn từ nối được → người chơi thắng ======
+if (!canContinue) {
+  const guildIdStr = message.guild.id.toString();   // đảm bảo string
+  const userIdStr = message.author.id.toString();
 
-      gameStates.delete(message.channel.id);
-      delete activeGames[message.channel.id];
-      saveGames();
+  // Khởi tạo object cho server nếu chưa có
+  if (!scores[guildIdStr]) scores[guildIdStr] = {};
 
-      return message.channel.send(
-        `🏆 **${message.author.username}** thắng ván này với từ cuối: **${newWord}**!\n🎉 Nhận được **+1 điểm**!\n💬 Gõ \`!play\` để bắt đầu ván mới.`
-      );
-    }
+  // Cộng điểm
+  scores[guildIdStr][userIdStr] = (scores[guildIdStr][userIdStr] || 0) + 1;
+
+  // Lưu scores ra file
+  try {
+    fs.writeFileSync(scoresPath, JSON.stringify(scores, null, 2));
+  } catch (err) {
+    console.error("⚠️ Lỗi lưu điểm:", err);
+  }
+
+  // Xoá game đang chạy
+  gameStates.delete(message.channel.id);
+  delete activeGames[message.channel.id];
+  saveGames();
+
+  return message.channel.send(
+    `🏆 **${message.author.username}** thắng ván này với từ cuối: **${newWord}**!\n🎉 Nhận được **+1 điểm**!\n💬 Gõ \`!play\` để bắt đầu ván mới.`
+  );
+}
+
 
     // Còn nối được → tiếp tục
     const nextHint = newWord.split(/\s+/).pop();
