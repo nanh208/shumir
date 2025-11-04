@@ -35,29 +35,37 @@ for (const file of commandFiles) {
 // ✅ Khởi tạo REST client
 const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 
+// ✅ Danh sách các server test muốn deploy nhanh
+const guildIds = [
+  // Thêm ID các server bạn muốn cập nhật ngay tại đây
+  // Ví dụ:
+  "123456789012345678",
+  "987654321098765432"
+];
+
 (async () => {
   try {
     console.log("🔄 Đang cập nhật slash commands...");
 
-    if (process.env.GUILD_ID) {
-      // ⚡ Deploy nhanh cho server test
-      await rest.put(
-        Routes.applicationGuildCommands(
-          process.env.CLIENT_ID,
-          process.env.GUILD_ID
-        ),
-        { body: commands }
-      );
-      console.log(
-        `✅ Đã đăng ký ${commands.length} lệnh cho GUILD_ID (${process.env.GUILD_ID})!`
-      );  
+    if (guildIds.length > 0) {
+      // ⚡ Deploy nhanh cho nhiều server test
+      for (const guildId of guildIds) {
+        await rest.put(
+          Routes.applicationGuildCommands(process.env.CLIENT_ID, guildId),
+          { body: commands }
+        );
+        console.log(`✅ Đã đăng ký ${commands.length} lệnh cho GUILD_ID ${guildId}!`);
+      }
     } else {
       // 🌍 Deploy toàn cầu (mất 1–2 tiếng để đồng bộ)
-      await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), {
-        body: commands,
-      });
+      await rest.put(
+        Routes.applicationCommands(process.env.CLIENT_ID),
+        { body: commands }
+      );
       console.log(`🌎 Đã đăng ký ${commands.length} lệnh global!`);
     }
+
+    console.log("✅ Hoàn tất cập nhật lệnh!");
   } catch (error) {
     console.error("❌ Lỗi khi deploy:", error);
   }
