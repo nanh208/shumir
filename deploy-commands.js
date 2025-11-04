@@ -5,7 +5,7 @@ const { REST, Routes } = require("discord.js");
 
 const commands = [];
 
-// ✅ Hàm đệ quy để đọc tất cả file .js trong thư mục /commands và các thư mục con
+// ✅ Hàm đệ quy đọc tất cả file .js trong thư mục /commands và các thư mục con
 const getAllCommandFiles = (dirPath, arrayOfFiles = []) => {
   const files = fs.readdirSync(dirPath);
   for (const file of files) {
@@ -35,35 +35,26 @@ for (const file of commandFiles) {
 // ✅ Khởi tạo REST client
 const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 
-// ✅ Danh sách các server test muốn deploy nhanh
-const guildIds = [
-  // Thêm ID các server bạn muốn cập nhật ngay tại đây
-  // Ví dụ:
-  "123456789012345678",
-  "987654321098765432"
-];
+// ✅ ID server test chính
+const mainGuildId = "1308052869559222272";
 
 (async () => {
   try {
     console.log("🔄 Đang cập nhật slash commands...");
 
-    if (guildIds.length > 0) {
-      // ⚡ Deploy nhanh cho nhiều server test
-      for (const guildId of guildIds) {
-        await rest.put(
-          Routes.applicationGuildCommands(process.env.CLIENT_ID, guildId),
-          { body: commands }
-        );
-        console.log(`✅ Đã đăng ký ${commands.length} lệnh cho GUILD_ID ${guildId}!`);
-      }
-    } else {
-      // 🌍 Deploy toàn cầu (mất 1–2 tiếng để đồng bộ)
-      await rest.put(
-        Routes.applicationCommands(process.env.CLIENT_ID),
-        { body: commands }
-      );
-      console.log(`🌎 Đã đăng ký ${commands.length} lệnh global!`);
-    }
+    // ⚡ Bước 1: Cập nhật cho server test trước
+    await rest.put(
+      Routes.applicationGuildCommands(process.env.CLIENT_ID, mainGuildId),
+      { body: commands }
+    );
+    console.log(`✅ Đã đăng ký ${commands.length} lệnh cho server test ${mainGuildId}!`);
+
+    // 🌍 Bước 2: Cập nhật global (để các server khác tự động nhận lệnh sau 5–60 phút)
+    await rest.put(
+      Routes.applicationCommands(process.env.CLIENT_ID),
+      { body: commands }
+    );
+    console.log(`🌎 Đã đăng ký ${commands.length} lệnh global (toàn bộ server)!`);
 
     console.log("✅ Hoàn tất cập nhật lệnh!");
   } catch (error) {
