@@ -61,7 +61,7 @@ const { activeGames, saveGames } = require("./data/activeGames.js");
 client.once("ready", async () => {
   console.log(`✅ Bot đã online: ${client.user.tag}`);
   client.user.setPresence({
-    activities: [{ name: "🎉 Giải trí & Nối Từ!", type: 0 }],
+    activities: [{ name: "🎉 Ma sói & Nối Từ!", type: 0 }],
     status: "online",
   });
 
