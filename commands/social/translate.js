@@ -15,7 +15,7 @@ module.exports = {
   async execute(interaction) {
     const text = interaction.options.getString('vanban');
     const lang = interaction.options.getString('ngonngu');
-    await interaction.deferReply();
+    // deferred by index.js
 
     try {
       const translated = await translate(text, { to: lang });

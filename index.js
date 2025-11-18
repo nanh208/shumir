@@ -95,11 +95,9 @@ client.on(Events.InteractionCreate, async interaction => {
     // ⚡ Giữ phiên tương tác (tránh lỗi Unknown Interaction)
     await interaction.deferReply({ ephemeral: false });
 
-    if (command.category === "games") {
-      await command.execute(interaction, gameStates);
-    } else {
-      await command.execute(interaction);
-    }
+    // Pass the client as second arg and gameStates as third so commands
+    // that need the client or the shared gameStates can access them.
+    await command.execute(interaction, client, gameStates);
   } catch (error) {
     console.error("❌ Lỗi khi xử lý lệnh:", error);
     const embed = new EmbedBuilder()

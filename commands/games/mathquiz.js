@@ -38,7 +38,7 @@ module.exports = {
     .setDescription('🧠 Đố toán — giải biểu thức. (Bot sinh bài ngẫu nhiên)'),
   cooldown: 3,
   async execute(interaction) {
-    await interaction.deferReply();
+    // deferred by index.js
     const difficulty = Math.floor(Math.random() * 3) + 2; // 2..4 ops
     const expr = genExpression(difficulty);
     // compute correct answer (round to 2 decimals)

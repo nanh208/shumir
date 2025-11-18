@@ -45,7 +45,7 @@ module.exports = {
 
   cooldown: 10,
   async execute(interaction) {
-    await interaction.deferReply();
+    // deferred by index.js
     const tries = interaction.options.getInteger('tries') || 8;
     const code = genCode(4); // bot random code, sẽ không tiết lộ
     const msg = await interaction.editReply({ embeds: [new EmbedBuilder().setTitle('🔐 CodeBreaker bắt đầu').setDescription(`Mình đã sinh 1 mã 4 chữ số không trùng. Bạn có **${tries}** lượt để đoán. Gõ đoán dưới dạng 4 chữ số (ví dụ: 1234).`).setColor('Purple').setFooter({ text: 'Bot sẽ trả về số đúng đúng vị trí (black) và đúng nhưng sai vị trí (white). Mình sẽ không tiết lộ mã.' })] });

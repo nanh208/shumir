@@ -7,7 +7,7 @@ module.exports = {
     .setDescription('Lấy một sự thật ngẫu nhiên thú vị 📘'),
 
   async execute(interaction) {
-    await interaction.deferReply();
+    // deferred by index.js
     try {
       const res = await fetch('https://uselessfacts.jsph.pl/random.json?language=en');
       const data = await res.json();

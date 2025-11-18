@@ -7,7 +7,7 @@ module.exports = {
     .setDescription("💬 Nhận một câu danh ngôn ngẫu nhiên!"),
 
   async execute(interaction) {
-    await interaction.deferReply();
+    // deferred by index.js
     try {
       const res = await fetch("https://api.quotable.io/random");
       const data = await res.json();

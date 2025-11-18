@@ -4,7 +4,7 @@ const fetch = require("node-fetch");
 module.exports = {
   data: new SlashCommandBuilder().setName("meme").setDescription("📸 Gửi một meme ngẫu nhiên!"),
   async execute(interaction) {
-    await interaction.deferReply();
+    // deferred by index.js
     const res = await fetch("https://meme-api.com/gimme");
     const data = await res.json();
     const embed = new EmbedBuilder()

@@ -11,7 +11,7 @@ module.exports = {
 
   async execute(interaction) {
     const location = interaction.options.getString('diadiem');
-    await interaction.deferReply();
+    // deferred by index.js
     try {
       const res = await fetch(`${API_KEY}/${encodeURIComponent(location)}?format=j1`);
       const data = await res.json();

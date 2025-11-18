@@ -27,7 +27,7 @@ module.exports = {
 
   async execute(interaction) {
     const sign = interaction.options.getString('cung');
-    await interaction.deferReply();
+    // deferred by index.js
     try {
       const res = await fetch(`https://aztro.sameerkumar.website/?sign=${sign}&day=today`, { method: 'POST' });
       const data = await res.json();

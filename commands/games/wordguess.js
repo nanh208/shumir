@@ -14,7 +14,7 @@ module.exports = {
 
   cooldown: 5,
   async execute(interaction) {
-    await interaction.deferReply();
+    // deferred by index.js
     const attemptsMax = interaction.options.getInteger('attempts') || 6;
     const word = WORDS[Math.floor(Math.random() * WORDS.length)].toLowerCase();
     const revealed = Array.from(word).map(ch => (ch === '-' ? '-' : '_'));

@@ -17,7 +17,7 @@ module.exports = {
 
   cooldown: 10,
   async execute(interaction) {
-    await interaction.deferReply();
+    // deferred by index.js
     const len = interaction.options.getInteger('length') || 5;
     const seq = genSeq(len);
     const show = seq.join(' ');

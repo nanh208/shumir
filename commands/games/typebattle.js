@@ -16,7 +16,7 @@ module.exports = {
 
   cooldown: 5,
   async execute(interaction) {
-    await interaction.deferReply();
+    // deferred by index.js
     const len = interaction.options.getInteger('length') || 12;
     const target = genString(len);
     const embed = new EmbedBuilder()
