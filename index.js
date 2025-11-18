@@ -87,29 +87,42 @@ client.once("ready", async () => {
 
 // --- Slash Commands ---
 client.on(Events.InteractionCreate, async interaction => {
-  if (!interaction.isChatInputCommand()) return;
-  const command = client.commands.get(interaction.commandName);
-  if (!command) return;
-
   try {
-    // ⚡ Giữ phiên tương tác (tránh lỗi Unknown Interaction)
-    await interaction.deferReply({ ephemeral: false });
+    // --- Slash commands ---
+    if (interaction.isChatInputCommand && interaction.isChatInputCommand()) {
+      const command = client.commands.get(interaction.commandName);
+      if (!command) return;
 
-    // Pass the client as second arg and gameStates as third so commands
-    // that need the client or the shared gameStates can access them.
-    await command.execute(interaction, client, gameStates);
+      // keep a global defer to allow commands to use editReply
+      await interaction.deferReply({ ephemeral: false }).catch(() => {});
+      await command.execute(interaction, client, gameStates);
+      return;
+    }
+
+    // --- Component interactions (buttons, select menus) ---
+    if (interaction.isButton && interaction.isButton() || interaction.isSelectMenu && interaction.isSelectMenu()) {
+      const customId = interaction.customId || '';
+
+      // convention: customId prefix is '<commandName>_' e.g. 'masoi_join' or 'masoi_vote_...'
+      const prefix = customId.split('_')[0];
+      const command = client.commands.get(prefix);
+      if (command && typeof command.component === 'function') {
+        await command.component(interaction, client, gameStates);
+        return;
+      }
+      // fallback: ignore if no handler
+      return;
+    }
   } catch (error) {
-    console.error("❌ Lỗi khi xử lý lệnh:", error);
-    const embed = new EmbedBuilder()
-      .setColor("Red")
-      .setTitle("❌ Lỗi khi chạy lệnh!")
-      .setDescription("Có vẻ Shumir hơi bối rối... bạn thử lại nhé!");
-
-    // Nếu interaction còn hợp lệ thì chỉnh sửa reply hiện tại
+    console.error('❌ Lỗi khi xử lý interaction:', error);
     try {
-      await interaction.editReply({ embeds: [embed] });
+      if (interaction.replied || interaction.deferred) {
+        await interaction.editReply({ content: '❌ Lỗi nội bộ khi xử lý tương tác.' }).catch(() => {});
+      } else {
+        await interaction.reply({ content: '❌ Lỗi nội bộ khi xử lý tương tác.', ephemeral: true }).catch(() => {});
+      }
     } catch {
-      console.log("⚠️ Interaction đã hết hạn, bỏ qua lỗi.");
+      // ignore
     }
   }
 });
