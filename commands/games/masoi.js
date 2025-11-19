@@ -48,6 +48,26 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName("masoi")
         .setDescription("Bắt đầu, tham gia và quản lý trò chơi Ma Sói.")
+        // Root options: allow `/masoi <mode> <players>` as shorthand
+        .addStringOption(opt =>
+            opt.setName('mode')
+               .setDescription('Chế độ chơi (classic, quick, turbo, chaos, custom).')
+               .setRequired(false)
+               .addChoices(
+                    { name: 'Classic (Cổ điển)', value: 'classic' },
+                    { name: 'Quick (Nhanh)', value: 'quick' },
+                    { name: 'Turbo (Siêu nhanh)', value: 'turbo' },
+                    { name: 'Chaos (Hỗn loạn)', value: 'chaos' },
+                    { name: 'Custom (Tùy chỉnh)', value: 'custom' },
+               )
+        )
+        .addIntegerOption(opt =>
+            opt.setName('players')
+               .setDescription('Tổng số người chơi (8-16). Nếu không có, dùng giá trị mặc định của chế độ.')
+               .setRequired(false)
+               .setMinValue(5)
+               .setMaxValue(20)
+        )
         .addSubcommand(subcommand =>
             subcommand
                 .setName("create")
@@ -71,6 +91,11 @@ module.exports = {
                         .setMinValue(8)
                         .setMaxValue(16)
                 )
+        )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('stop')
+                .setDescription('Dừng game hiện tại trong kênh (chỉ host hoặc admin).')
         )
         // Lệnh xem thông tin game đang chạy trong kênh
         .addSubcommand(subcommand =>
@@ -115,7 +140,22 @@ module.exports = {
             return interaction.editReply({ content: `❌ Bot Ma Sói hiện chỉ hoạt động trên kênh <#${cfgChannelId}>. Dùng lệnh "/masoik" (quyền Manage Guild) để cập nhật kênh cho server này.` });
         }
         
-        const subcommand = interaction.options.getSubcommand();
+        let subcommand = null;
+        try {
+            subcommand = interaction.options.getSubcommand();
+        } catch (e) {
+            subcommand = null; // no subcommand used
+        }
+
+        // Support root invocation: `/masoi <mode> <players>` as shorthand for create
+        const rootMode = interaction.options.getString('mode');
+        const rootPlayers = interaction.options.getInteger('players');
+        if (!subcommand && rootMode) {
+            subcommand = 'create';
+            // emulate options inside create
+            interaction.options._tempRootMode = rootMode;
+            interaction.options._tempRootPlayers = rootPlayers;
+        }
         const channelId = interaction.channel.id;
         let game = activeWerewolfGames.get(channelId);
 
@@ -154,8 +194,8 @@ module.exports = {
                 return interaction.editReply({ content: "❌ Một trò chơi Ma Sói đang diễn ra hoặc đang chờ trong kênh này!" });
             }
 
-            const numPlayers = interaction.options.getInteger("players");
-            const mode = interaction.options.getString("mode");
+            const numPlayers = interaction.options._tempRootPlayers || interaction.options.getInteger("players");
+            const mode = interaction.options._tempRootMode || interaction.options.getString("mode");
 
             // Khởi tạo trạng thái game
             game = {
@@ -242,6 +282,24 @@ module.exports = {
             
             checkEmbed.setDescription(gameList);
             return interaction.editReply({ embeds: [checkEmbed] });
+
+        } else if (subcommand === 'stop') {
+            // Stop/force end game in this channel
+            if (!game) return interaction.editReply({ content: '❌ Không có game nào đang chạy trong kênh này.' });
+            const isHost = game.gameMaster === interaction.user.id;
+            const isAdmin = interaction.member?.permissions?.has(PermissionFlagsBits.ManageGuild);
+            if (!isHost && !isAdmin) return interaction.editReply({ content: '❌ Chỉ host hoặc admin mới có thể dừng game.' });
+
+            // Unlock channel and remove game
+            try {
+                const channel = await client.channels.fetch(game.channelId);
+                if (channel && channel.guild && channel.guild.roles.everyone) {
+                    await channel.permissionOverwrites.edit(channel.guild.roles.everyone, { SendMessages: true }).catch(()=>{});
+                }
+            } catch (e) { console.error('Lỗi khi mở khóa kênh khi dừng game:', e); }
+
+            activeWerewolfGames.delete(game.channelId);
+            return interaction.editReply({ content: '✅ Game Ma Sói đã bị dừng bởi host/admin.' });
 
         } else {
             // Lệnh con không hợp lệ

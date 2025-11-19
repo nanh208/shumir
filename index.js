@@ -82,42 +82,13 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     // --- BUTTON & SELECT MENU ---
-    const { customId, user } = interaction;
-
-    // 1. BỎ PHIẾU NGÀY
-    if (customId?.startsWith("masoi_day_vote_")) {
-      const targetId = customId.replace("masoi_day_vote_", "");
-      const game = activeWerewolfGames.get(interaction.channelId);
-      if (!game) return interaction.reply({ content: "❌ Không tìm thấy game Ma Sói.", ephemeral: true });
-      return processDayVote(game, user.id, targetId, client, interaction);
-    }
-
-    // 2. HÀNH ĐỘNG ĐÊM (SelectMenu)
-    else if (customId?.startsWith("masoi_action_")) {
-      // masoi_action_<channelId>_<roleKey>
-      const parts = customId.split("_");
-      const channelId = parts[2];
-      const roleKey = parts[3];
-      const game = activeWerewolfGames.get(channelId);
-      if (!game) return interaction.reply({ content: "❌ Không tìm thấy game Ma Sói.", ephemeral: true });
-
-      const selectedTargetId = interaction.values?.[0];
-      if (!selectedTargetId) return interaction.reply({ content: "❌ Bạn chưa chọn mục tiêu.", ephemeral: true });
-
-      game.nightActions.set(roleKey, { performerId: user.id, targetId: selectedTargetId });
-      return interaction.reply({ content: `✅ Bạn đã chọn <@${selectedTargetId}>`, ephemeral: true });
-    }
-
-    // 3. THỊ TRƯỞNG QUYẾT ĐỊNH
-    else if (customId?.startsWith("masoi_mayor_")) {
-      // masoi_mayor_<channelId>_<targetId>
-      const parts = customId.split("_");
-      const channelId = parts[2];
-      const hangedId = parts[3];
-      const game = activeWerewolfGames.get(channelId);
-      if (!game) return interaction.reply({ content: "❌ Không tìm thấy game Ma Sói.", ephemeral: true });
-
-      return processMayorDecision(game, hangedId, client, interaction);
+    const { customId } = interaction;
+    // Delegate any masoi_* interactions to the masoi command component handler
+    if (customId?.startsWith('masoi_')) {
+      const masoiCmd = client.commands.get('masoi');
+      if (masoiCmd && typeof masoiCmd.component === 'function') {
+        return masoiCmd.component(interaction, client, client.gameStates);
+      }
     }
 
   } catch (err) {
