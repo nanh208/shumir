@@ -77,7 +77,7 @@ client.on("interactionCreate", async (interaction) => {
     if (interaction.isChatInputCommand()) {
       const command = client.commands.get(interaction.commandName);
       if (!command) return;
-      await interaction.deferReply({ ephemeral: false }).catch(() => {});
+      // Let individual command handlers decide when/if to defer/reply.
       return command.execute(interaction, client, client.gameStates);
     }
 

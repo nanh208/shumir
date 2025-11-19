@@ -6,6 +6,8 @@ const { activeWerewolfGames } = require("./activeWerewolfGames.js");
 // Cấu hình linh hoạt theo mode và số người chơi (ví dụ cho mode 'classic')
 const ROLE_CONFIGS = {
     classic: {
+        5: ['WEREWOLF', 'SEER', 'BODYGUARD', 'VILLAGER', 'VILLAGER'],
+        6: ['WEREWOLF', 'WEREWOLF', 'SEER', 'BODYGUARD', 'VILLAGER', 'VILLAGER'],
         8: ['WEREWOLF', 'WEREWOLF', 'SEER', 'BODYGUARD', 'MAYOR', 'VILLAGER', 'VILLAGER', 'VILLAGER'],
         10: ['WEREWOLF', 'WEREWOLF', 'WEREWOLF', 'SEER', 'BODYGUARD', 'MAYOR', 'VILLAGER', 'VILLAGER', 'VILLAGER', 'VILLAGER'],
         12: ['WEREWOLF', 'WEREWOLF', 'WEREWOLF', 'SEER', 'BODYGUARD', 'MAYOR', 'VILLAGER', 'VILLAGER', 'VILLAGER', 'VILLAGER', 'VILLAGER', 'VILLAGER'],
@@ -45,8 +47,8 @@ function assignRoles(game) {
     
     // Kiểm tra cấu hình
     if (!config) {
-        if (game.players.size < 8) {
-            console.error(`Không đủ người chơi (min 8) hoặc không tìm thấy config cho ${game.players.size} người.`);
+        if (game.players.size < 5) {
+            console.error(`Không đủ người chơi (min 5) hoặc không tìm thấy config cho ${game.players.size} người.`);
         } else {
             console.error(`Không tìm thấy cấu hình vai trò cho mode: ${game.mode}, người: ${game.players.size}`);
         }
@@ -595,7 +597,7 @@ function checkWinCondition(game, channel) {
     if (winMessage) {
         game.status = 'finished';
         activeWerewolfGames.delete(game.channelId); 
-        channel.send(`--- **TRÒ CHƠI KẾT THÚC** ---\n${winMessage}\n\n/masoi help để xem lại hướng dẫn!`);
+        channel.send(`--- **TRÒ CHƠI KẾT THÚC** ---\n${winMessage}\n\nDùng \/masoi roles để xem lại danh sách vai trò.`);
         return true;
     }
     return false;

@@ -88,7 +88,7 @@ module.exports = {
                     option.setName("players")
                         .setDescription("Tổng số người chơi (từ 8-16) để chia vai cơ bản.")
                         .setRequired(true)
-                        .setMinValue(8)
+                        .setMinValue(5)
                         .setMaxValue(16)
                 )
         )
@@ -120,11 +120,7 @@ module.exports = {
                 )
         )
         // Lệnh xem hướng dẫn chung
-        .addSubcommand(subcommand =>
-            subcommand
-                .setName("help")
-                .setDescription("Hiện hướng dẫn chi tiết, luật chơi và cú pháp.")
-        )
+        
         // Lệnh kiểm tra game active trong server
         .addSubcommand(subcommand =>
             subcommand
@@ -162,24 +158,7 @@ module.exports = {
         const channelId = interaction.channel.id;
         let game = activeWerewolfGames.get(channelId);
 
-        // --- Xử lý HELP/GUIDE (đã format lại) ---
-        if (subcommand === "help") {
-            const gameModesText = GAME_MODES.map(m => `**[★] ${m.name.toUpperCase()}** → ${m.description}`).join('\n');
-            const rulesText = `**Luật Cơ Bản:** Ma Sói cần giết tất cả Dân Làng, Dân Làng cần treo cổ tất cả Ma Sói. Các vai trò đặc biệt có khả năng riêng. Chi tiết: ...`;
-            const tipsText = `**Mẹo:** Thảo luận, nghi ngờ, và bỏ phiếu đúng người. Vai trò ẩn nên hành động kín đáo.`;
-
-            const embed = new EmbedBuilder()
-                .setTitle('📚 Hướng Dẫn Chơi Ma Sói (Werewolf)')
-                .setColor('#FFD700')
-                .addFields(
-                    { name: '💬 Cú Pháp Cơ Bản', value: '`/masoi create <mode> <players>`: Tạo phòng chờ\n`/masoi join/leave`: Tham gia/Rời phòng chờ\n`/masoi info`: Xem trạng thái game\n`/masoi roles`: Xem chi tiết vai trò' },
-                    { name: '⚙️ Chế Độ Chơi', value: gameModesText },
-                    { name: '⚖️ Luật Chơi', value: rulesText },
-                    { name: '💡 Mẹo Chơi', value: tipsText }
-                );
-
-            return interaction.editReply({ embeds: [embed] }); 
-        }
+        
 
         // --- Xử lý ROLES ---
         if (subcommand === "roles") {
@@ -237,7 +216,7 @@ module.exports = {
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId('masoi_join').setLabel('Tham gia').setStyle(ButtonStyle.Success),
                 new ButtonBuilder().setCustomId('masoi_leave').setLabel('Rời game').setStyle(ButtonStyle.Danger),
-                new ButtonBuilder().setCustomId('masoi_start').setLabel('Bắt đầu').setStyle(ButtonStyle.Primary).setDisabled(game.players.size < 8), // Disable nếu chưa đủ 8
+                new ButtonBuilder().setCustomId('masoi_start').setLabel('Bắt đầu').setStyle(ButtonStyle.Primary).setDisabled(game.players.size < 5), // Disable nếu chưa đủ 5
                 new ButtonBuilder().setCustomId('masoi_cancel').setLabel('Hủy game').setStyle(ButtonStyle.Secondary),
             );
 
@@ -319,7 +298,7 @@ module.exports = {
 
         } else {
             // Lệnh con không hợp lệ
-            return interaction.editReply({ content: "Lệnh con không hợp lệ. Dùng `/masoi help` để xem cú pháp." });
+            return interaction.editReply({ content: "Lệnh con không hợp lệ. Dùng `/masoi roles` để xem danh sách vai trò." });
         }
     },
 
@@ -442,7 +421,7 @@ module.exports = {
         // START (Chuyển từ lobby sang game)
         if (action === 'start') {
             if (game.gameMaster !== interaction.user.id) return interaction.reply({ content: '❌ Chỉ host mới có thể bắt đầu game.', ephemeral: true }).catch(()=>{});
-            if (game.players.size < 8) return interaction.reply({ content: `❌ Cần ít nhất 8 người để bắt đầu. Hiện tại: ${game.players.size} người.`, ephemeral: true }).catch(()=>{});
+            if (game.players.size < 5) return interaction.reply({ content: `❌ Cần ít nhất 5 người để bắt đầu. Hiện tại: ${game.players.size} người.`, ephemeral: true }).catch(()=>{});
 
             // Acknowledge then send DMs
             await interaction.deferUpdate().catch(()=>{});
