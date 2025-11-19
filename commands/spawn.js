@@ -28,13 +28,20 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('spawn')
     .setDescription('Quản lý spawn pet')
-    .addSubcommand(sub => sub.setName('register').setDescription('Đăng ký kênh hiện tại làm kênh spawn (admin)').setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild))
-    .addSubcommand(sub => sub.setName('unregister').setDescription('Hủy đăng ký kênh spawn (admin)').setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild))
-    .addSubcommand(sub => sub.setName('now').setDescription('Bắt đầu spawn ngay (admin)').setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild))
+    .addSubcommand(sub => sub.setName('register').setDescription('Đăng ký kênh hiện tại làm kênh spawn (admin)'))
+    .addSubcommand(sub => sub.setName('unregister').setDescription('Hủy đăng ký kênh spawn (admin)'))
+    .addSubcommand(sub => sub.setName('now').setDescription('Bắt đầu spawn ngay (admin)'))
     .addSubcommand(sub => sub.setName('kill').setDescription('Giết pet để nhận kẹo').addStringOption(opt => opt.setName('id').setDescription('ID pet').setRequired(true))),
 
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
+    // permission guard for admin-only subcommands
+    const adminOnly = ['register', 'unregister', 'now'];
+    if (adminOnly.includes(sub)) {
+      if (!interaction.member || !interaction.member.permissions || !interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+        return interaction.reply({ content: '❌ Bạn cần quyền `Manage Server` để dùng lệnh này.', ephemeral: true });
+      }
+    }
     const data = readJSON(petsFile);
     if (!data.spawnChannels) data.spawnChannels = {};
 
