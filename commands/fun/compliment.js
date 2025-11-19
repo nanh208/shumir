@@ -6,7 +6,7 @@ module.exports = {
     .setDescription('Khen ai đó một cách dễ thương 💖')
     .addUserOption(option => option.setName('target').setDescription('Người được khen').setRequired(true)),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     const target = interaction.options.getUser('target');
     const compliments = [
       "Bạn là người khiến Discord sáng bừng lên ✨",

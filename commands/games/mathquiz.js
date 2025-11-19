@@ -37,7 +37,7 @@ module.exports = {
     .setName('mathquiz')
     .setDescription('🧠 Đố toán — giải biểu thức. (Bot sinh bài ngẫu nhiên)'),
   cooldown: 3,
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     // deferred by index.js
     const difficulty = Math.floor(Math.random() * 3) + 2; // 2..4 ops
     const expr = genExpression(difficulty);

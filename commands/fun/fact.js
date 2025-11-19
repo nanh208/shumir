@@ -6,7 +6,7 @@ module.exports = {
     .setName('fact')
     .setDescription('Lấy một sự thật ngẫu nhiên thú vị 📘'),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     // deferred by index.js
     try {
       const res = await fetch('https://uselessfacts.jsph.pl/random.json?language=en');

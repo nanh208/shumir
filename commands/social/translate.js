@@ -12,7 +12,7 @@ module.exports = {
         .setRequired(true)
     ),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     const text = interaction.options.getString('vanban');
     const lang = interaction.options.getString('ngonngu');
     // deferred by index.js

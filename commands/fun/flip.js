@@ -5,7 +5,7 @@ module.exports = {
     .setName('flip')
     .setDescription('Tung đồng xu 🪙'),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     const result = Math.random() < 0.5 ? '🪙 Mặt Ngửa!' : '🪙 Mặt Sấp!';
     const embed = new EmbedBuilder()
       .setColor('Gold')

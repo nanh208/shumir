@@ -6,7 +6,7 @@ module.exports = {
     .setName('botinfo')
     .setDescription('Xem thông tin về bot 🤖'),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     const uptime = formatUptime(interaction.client.uptime);
     const embed = new EmbedBuilder()
       .setColor('Blurple')

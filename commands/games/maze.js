@@ -41,7 +41,7 @@ module.exports = {
     .setName('maze')
     .setDescription('🌀 Đi mê cung 5x5 — dùng lệnh text up/down/left/right để di chuyển (60s).'),
   cooldown: 10,
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     // deferred by index.js
     const n = 5;
     const maze = makeMaze(n);

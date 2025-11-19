@@ -9,7 +9,7 @@ module.exports = {
     .setDescription('Xem thời tiết ở một địa điểm ☁️')
     .addStringOption(option => option.setName('diadiem').setDescription('Tên thành phố hoặc quốc gia').setRequired(true)),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     const location = interaction.options.getString('diadiem');
     // deferred by index.js
     try {

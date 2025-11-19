@@ -44,7 +44,7 @@ module.exports = {
     .addIntegerOption(o => o.setName('tries').setDescription('Số lượt thử (mặc định 8)').setMinValue(3).setMaxValue(20)),
 
   cooldown: 10,
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     // deferred by index.js
     const tries = interaction.options.getInteger('tries') || 8;
     const code = genCode(4); // bot random code, sẽ không tiết lộ

@@ -1,4 +1,4 @@
-// node deploy-commands.js giữ nguyên
+// node deploy-commands.js
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
@@ -33,6 +33,12 @@ for (const file of commandFiles) {
   }
 }
 
+// ✅ Kiểm tra TOKEN và CLIENT_ID trước khi tiếp tục
+if (!process.env.TOKEN || !process.env.CLIENT_ID) {
+  console.error("❌ Lỗi: TOKEN hoặc CLIENT_ID chưa được thiết lập trong file .env");
+  process.exit(1);
+}
+
 // ✅ Khởi tạo REST client
 const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 
@@ -43,14 +49,28 @@ const mainGuildId = "1308052869559222272";
   try {
     console.log("🔄 Đang cập nhật slash commands...");
 
-    // ⚡ Bước 1: Cập nhật cho server test trước
+    // --- XÓA HẾT LỆNH CŨ TRÊN SERVER TRƯỚC ---
+    const existingCommands = await rest.get(
+      Routes.applicationGuildCommands(process.env.CLIENT_ID, mainGuildId)
+    );
+    if (existingCommands.length > 0) {
+      console.log(`⚠️ Xóa ${existingCommands.length} lệnh cũ trên server ${mainGuildId}...`);
+      for (const cmd of existingCommands) {
+        await rest.delete(
+          Routes.applicationGuildCommand(process.env.CLIENT_ID, mainGuildId, cmd.id)
+        );
+      }
+      console.log("✅ Đã xóa xong tất cả lệnh cũ trên server test!");
+    }
+
+    // --- ĐĂNG KÝ LỆNH MỚI CHO SERVER ---
     await rest.put(
       Routes.applicationGuildCommands(process.env.CLIENT_ID, mainGuildId),
       { body: commands }
     );
     console.log(`✅ Đã đăng ký ${commands.length} lệnh cho server test ${mainGuildId}!`);
 
-    // 🌍 Bước 2: Cập nhật global (để các server khác tự động nhận lệnh sau 5–60 phút)
+    // --- ĐĂNG KÝ LỆNH GLOBAL ---
     await rest.put(
       Routes.applicationCommands(process.env.CLIENT_ID),
       { body: commands }

@@ -28,7 +28,7 @@ module.exports = {
       sub.setName("backup").setDescription("Sao lưu dữ liệu BXH & Game ra file JSON")
     ),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     // Kiểm tra quyền admin
     if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
       return interaction.reply({ content: "❌ Lệnh này chỉ dành cho **Admin**!", ephemeral: true });

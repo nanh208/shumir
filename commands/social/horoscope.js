@@ -25,7 +25,7 @@ module.exports = {
         )
     ),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     const sign = interaction.options.getString('cung');
     // deferred by index.js
     try {

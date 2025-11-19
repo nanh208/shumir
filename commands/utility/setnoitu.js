@@ -12,7 +12,7 @@ module.exports = {
       PermissionsBitField.Flags.Administrator | PermissionsBitField.Flags.ManageGuild
     ),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     try {
       const channelId = interaction.channel.id;
       let configData = {};

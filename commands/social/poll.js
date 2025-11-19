@@ -7,7 +7,7 @@ module.exports = {
     .addStringOption(option => option.setName('cauhoi').setDescription('Câu hỏi cho cuộc bình chọn').setRequired(true))
     .addStringOption(option => option.setName('luachon').setDescription('Các lựa chọn, cách nhau bằng dấu phẩy (,)').setRequired(true)),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     const question = interaction.options.getString('cauhoi');
     const choices = interaction.options.getString('luachon').split(',').map(c => c.trim()).filter(c => c.length);
 

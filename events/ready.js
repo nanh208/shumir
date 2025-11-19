@@ -11,6 +11,16 @@ module.exports = {
   async execute(client) {
     console.log(`✅ Bot đã sẵn sàng: ${client.user.tag}`);
 
+    // Đặt presence giống như trước (hợp nhất vào đây để tránh duplicate)
+    try {
+      client.user.setPresence({
+        activities: [{ name: "🎉 Ma Sói & Nối Từ!", type: 0 }],
+        status: "online",
+      });
+    } catch (e) {
+      console.warn('Không thể set presence:', e?.message || e);
+    }
+
     // Đọc cấu hình để biết kênh chơi Nối Từ
     if (!fs.existsSync(configPath)) return;
     const configData = JSON.parse(fs.readFileSync(configPath, "utf8"));
@@ -39,7 +49,7 @@ module.exports = {
           `👉 Nối tiếp bằng từ bắt đầu với: **${savedGame.lastWord.split(" ").pop()}**`,
       });
 
-      // Đồng bộ lại với gameStates trong RAM (để tiếp tục nối)
+      // Đồng bộ lại với `client.gameStates` trong RAM (để tiếp tục nối)
       const gameStates = client.gameStates || new Map();
       gameStates.set(channelId, {
         lastWord: savedGame.lastWord,

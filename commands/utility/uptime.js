@@ -5,7 +5,7 @@ module.exports = {
     .setName('uptime')
     .setDescription('Xem bot đã hoạt động bao lâu 🕐'),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     const uptime = formatUptime(interaction.client.uptime);
     const embed = new EmbedBuilder()
       .setColor('Green')

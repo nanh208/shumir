@@ -16,7 +16,7 @@ module.exports = {
     .setDescription("🎱 Hỏi quả cầu tiên tri Shumir!")
     .addStringOption(opt => opt.setName("câu_hỏi").setDescription("Câu hỏi của bạn").setRequired(true)),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     const question = interaction.options.getString("câu_hỏi");
     const reply = answers[Math.floor(Math.random() * answers.length)];
     const embed = new EmbedBuilder()

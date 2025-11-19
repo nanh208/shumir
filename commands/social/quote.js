@@ -6,7 +6,7 @@ module.exports = {
     .setName("quote")
     .setDescription("💬 Nhận một câu danh ngôn ngẫu nhiên!"),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     // deferred by index.js
     try {
       const res = await fetch("https://api.quotable.io/random");

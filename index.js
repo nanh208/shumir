@@ -1,9 +1,15 @@
-// index.js — Shumir Bot (chuẩn hóa, tránh trùng log, hỗ trợ khôi phục Nối Từ)
+// index.js — Shumir Bot (Ma Sói + Nối Từ)
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
-const { Client, Collection, GatewayIntentBits, EmbedBuilder, Events } = require("discord.js");
+const {
+  Client,
+  Collection,
+  GatewayIntentBits,
+  Events,
+} = require("discord.js");
 
+// ====== CLIENT ======
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -12,119 +18,119 @@ const client = new Client({
   ],
 });
 
-// --- LOGIC NỐI TỪ ---
-const gameStates = new Map();
+// ====== STATE GAME ======
+client.gameStates = new Map();          // Nối Từ
+const { activeWerewolfGames } = require("./utils/activeWerewolfGames.js");
 
-// 📂 Nạp Commands
+// ====== LOAD SLASH COMMANDS ======
 client.commands = new Collection();
 const commandsPath = path.join(__dirname, "commands");
-const commandFolders = fs.readdirSync(commandsPath);
 
-for (const folder of commandFolders) {
-  const folderPath = path.join(commandsPath, folder);
-  if (fs.statSync(folderPath).isDirectory()) {
-    const commandFiles = fs.readdirSync(folderPath).filter(f => f.endsWith(".js"));
-    for (const file of commandFiles) {
-      const filePath = path.join(folderPath, file);
-      const command = require(filePath);
-      if ("data" in command && "execute" in command) {
-        command.category = folder;
-        client.commands.set(command.data.name, command);
-      } else {
-        console.warn(`[⚠️] Lệnh ${file} thiếu "data" hoặc "execute".`);
-      }
-    }
-  }
-}
-console.log(`✅ Đã tải ${client.commands.size} slash commands.`);
+// Load lệnh root
+fs.readdirSync(commandsPath)
+  .filter(f => f.endsWith(".js"))
+  .forEach(file => {
+    const cmd = require(path.join(commandsPath, file));
+    if (cmd.data && cmd.execute) client.commands.set(cmd.data.name, cmd);
+    else console.warn(`[⚠️] Lệnh ${file} thiếu data hoặc execute.`);
+});
 
-// 📂 Nạp Events
-const eventsPath = path.join(__dirname, "events");
-const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith(".js"));
-
-for (const file of eventFiles) {
-  const filePath = path.join(eventsPath, file);
-  const event = require(filePath);
-
-  if (event.name === Events.MessageCreate) {
-    client.on(event.name, (...args) => event.execute(...args, gameStates));
-  } else if (event.once) {
-    client.once(event.name, (...args) => event.execute(...args));
-  } else {
-    client.on(event.name, (...args) => event.execute(...args));
-  }
-}
-console.log(`✅ Đã tải ${eventFiles.length} events.`);
-
-// --- Khi Bot sẵn sàng ---
-const { activeGames, saveGames } = require("./data/activeGames.js");
-client.once("ready", async () => {
-  console.log(`✅ Bot đã online: ${client.user.tag}`);
-  client.user.setPresence({
-    activities: [{ name: "🎉 Ma sói & Nối Từ!", type: 0 }],
-    status: "online",
+// Load lệnh trong subfolder
+fs.readdirSync(commandsPath)
+  .filter(name => fs.statSync(path.join(commandsPath, name)).isDirectory())
+  .forEach(folder => {
+    const folderPath = path.join(commandsPath, folder);
+    fs.readdirSync(folderPath)
+      .filter(f => f.endsWith(".js"))
+      .forEach(file => {
+        const cmd = require(path.join(folderPath, file));
+        if (cmd.data && cmd.execute) {
+          cmd.category = folder;
+          client.commands.set(cmd.data.name, cmd);
+        } else console.warn(`[⚠️] Lệnh ${file} thiếu data hoặc execute.`);
+      });
   });
 
-  const configPath = path.resolve(__dirname, "./data/game-config.json");
-  if (fs.existsSync(configPath)) {
-    const { wordGameChannelId } = JSON.parse(fs.readFileSync(configPath, "utf8"));
-    if (wordGameChannelId) {
-      const channel = await client.channels.fetch(wordGameChannelId).catch(() => null);
-      if (channel) {
-        await channel.permissionOverwrites.edit(channel.guild.roles.everyone, {
-          SendMessages: true,
-        });
-        channel.send("🔓 Bot đã online — tiếp tục trò chơi nối từ nào!");
+console.log(`✅ Đã tải ${client.commands.size} slash commands.`);
 
-        const gameData = activeGames[wordGameChannelId];
-        if (gameData && gameData.started) {
-          channel.send(`📜 Tiếp tục từ cuối cùng: **${gameData.lastWord}** (người cuối: <@${gameData.lastPlayer}>)`);
-        }
-      }
-    }
-  }
-});
+// ====== LOAD EVENTS ======
+const eventsPath = path.join(__dirname, "events");
+fs.readdirSync(eventsPath)
+  .filter(f => f.endsWith(".js"))
+  .forEach(file => {
+    const evt = require(path.join(eventsPath, file));
+    if (evt.once) client.once(evt.name, (...args) => evt.execute(...args));
+    else client.on(evt.name, (...args) => evt.execute(...args, client.gameStates));
+  });
 
-// --- Slash Commands ---
-client.on(Events.InteractionCreate, async interaction => {
+console.log(`✅ Đã tải ${fs.readdirSync(eventsPath).length} events.`);
+
+// NOTE: Ready handling (presence & restore) is implemented in `events/ready.js`.
+// The ready event there will run once and restore any saved games.
+
+// ====== INTERACTION HANDLER ======
+const { processDayVote, processMayorDecision } = require("./utils/werewolfLogic.js");
+
+client.on("interactionCreate", async (interaction) => {
   try {
-    // --- Slash commands ---
-    if (interaction.isChatInputCommand && interaction.isChatInputCommand()) {
+    // --- SLASH COMMAND ---
+    if (interaction.isChatInputCommand()) {
       const command = client.commands.get(interaction.commandName);
       if (!command) return;
-
-      // keep a global defer to allow commands to use editReply
       await interaction.deferReply({ ephemeral: false }).catch(() => {});
-      await command.execute(interaction, client, gameStates);
-      return;
+      return command.execute(interaction, client, client.gameStates);
     }
 
-    // --- Component interactions (buttons, select menus) ---
-    if (interaction.isButton && interaction.isButton() || interaction.isSelectMenu && interaction.isSelectMenu()) {
-      const customId = interaction.customId || '';
+    // --- BUTTON & SELECT MENU ---
+    const { customId, user } = interaction;
 
-      // convention: customId prefix is '<commandName>_' e.g. 'masoi_join' or 'masoi_vote_...'
-      const prefix = customId.split('_')[0];
-      const command = client.commands.get(prefix);
-      if (command && typeof command.component === 'function') {
-        await command.component(interaction, client, gameStates);
-        return;
-      }
-      // fallback: ignore if no handler
-      return;
+    // 1. BỎ PHIẾU NGÀY
+    if (customId?.startsWith("masoi_day_vote_")) {
+      const targetId = customId.replace("masoi_day_vote_", "");
+      const game = activeWerewolfGames.get(interaction.channelId);
+      if (!game) return interaction.reply({ content: "❌ Không tìm thấy game Ma Sói.", ephemeral: true });
+      return processDayVote(game, user.id, targetId, client, interaction);
     }
-  } catch (error) {
-    console.error('❌ Lỗi khi xử lý interaction:', error);
+
+    // 2. HÀNH ĐỘNG ĐÊM (SelectMenu)
+    else if (customId?.startsWith("masoi_action_")) {
+      // masoi_action_<channelId>_<roleKey>
+      const parts = customId.split("_");
+      const channelId = parts[2];
+      const roleKey = parts[3];
+      const game = activeWerewolfGames.get(channelId);
+      if (!game) return interaction.reply({ content: "❌ Không tìm thấy game Ma Sói.", ephemeral: true });
+
+      const selectedTargetId = interaction.values?.[0];
+      if (!selectedTargetId) return interaction.reply({ content: "❌ Bạn chưa chọn mục tiêu.", ephemeral: true });
+
+      game.nightActions.set(roleKey, { performerId: user.id, targetId: selectedTargetId });
+      return interaction.reply({ content: `✅ Bạn đã chọn <@${selectedTargetId}>`, ephemeral: true });
+    }
+
+    // 3. THỊ TRƯỞNG QUYẾT ĐỊNH
+    else if (customId?.startsWith("masoi_mayor_")) {
+      // masoi_mayor_<channelId>_<targetId>
+      const parts = customId.split("_");
+      const channelId = parts[2];
+      const hangedId = parts[3];
+      const game = activeWerewolfGames.get(channelId);
+      if (!game) return interaction.reply({ content: "❌ Không tìm thấy game Ma Sói.", ephemeral: true });
+
+      return processMayorDecision(game, hangedId, client, interaction);
+    }
+
+  } catch (err) {
+    console.error("❌ Lỗi interaction:", err);
     try {
       if (interaction.replied || interaction.deferred) {
-        await interaction.editReply({ content: '❌ Lỗi nội bộ khi xử lý tương tác.' }).catch(() => {});
+        await interaction.editReply({ content: "❌ Lỗi nội bộ khi xử lý interaction." });
       } else {
-        await interaction.reply({ content: '❌ Lỗi nội bộ khi xử lý tương tác.', ephemeral: true }).catch(() => {});
+        await interaction.reply({ content: "❌ Lỗi nội bộ khi xử lý interaction.", ephemeral: true });
       }
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 });
 
+// ====== LOGIN ======
 client.login(process.env.TOKEN);

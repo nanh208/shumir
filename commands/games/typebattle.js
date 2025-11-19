@@ -15,7 +15,7 @@ module.exports = {
     .addIntegerOption(o => o.setName('length').setDescription('Độ dài chuỗi (mặc định 12)').setMinValue(5).setMaxValue(30)),
 
   cooldown: 5,
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     // deferred by index.js
     const len = interaction.options.getInteger('length') || 12;
     const target = genString(len);

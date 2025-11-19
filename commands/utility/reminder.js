@@ -7,7 +7,7 @@ module.exports = {
     .addStringOption(option => option.setName('thoigian').setDescription('Ví dụ: 10m, 2h, 1d').setRequired(true))
     .addStringOption(option => option.setName('noidung').setDescription('Nội dung lời nhắc').setRequired(true)),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     const timeStr = interaction.options.getString('thoigian');
     const message = interaction.options.getString('noidung');
 

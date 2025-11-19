@@ -13,7 +13,7 @@ module.exports = {
     .addIntegerOption(opt => opt.setName('attempts').setDescription('Số lần sai tối đa (mặc định 6)').setMinValue(1).setMaxValue(12)),
 
   cooldown: 5,
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     // deferred by index.js
     const attemptsMax = interaction.options.getInteger('attempts') || 6;
     const word = WORDS[Math.floor(Math.random() * WORDS.length)].toLowerCase();

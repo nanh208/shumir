@@ -9,7 +9,7 @@ module.exports = {
     .setName("endgame")
     .setDescription("❌ Thoát khỏi mini game bạn đang chơi"),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     const userId = interaction.user.id;
 
     // Kiểm tra người chơi có đang chơi không

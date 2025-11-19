@@ -12,7 +12,7 @@ module.exports = {
           { name: "✂️ Kéo", value: "kéo" }
         )),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     const userChoice = interaction.options.getString("chọn");
     const botChoice = ["búa", "bao", "kéo"][Math.floor(Math.random() * 3)];
 

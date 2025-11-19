@@ -9,7 +9,7 @@ const jokes = [
 
 module.exports = {
   data: new SlashCommandBuilder().setName("joke").setDescription("🤣 Nghe một câu chuyện cười!"),
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     const joke = jokes[Math.floor(Math.random() * jokes.length)];
     const embed = new EmbedBuilder().setColor("Yellow").setTitle("☕ Truyện cười").setDescription(joke);
     await interaction.reply({ embeds: [embed] });

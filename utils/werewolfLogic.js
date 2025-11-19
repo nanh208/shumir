@@ -4,30 +4,37 @@ const { activeWerewolfGames } = require("./activeWerewolfGames.js");
 
 // --- HẰNG SỐ VAI TRÒ & THỜI GIAN ---
 const ROLES = {
+    // Thêm nightAbility: true cho các vai trò có hành động đêm
     WEREWOLF: { name: "Ma Sói 🐺", team: "Werewolf", description: "Mỗi đêm giết 1 người.", nightAbility: true, order: 10 },
     SEER: { name: "Tiên Tri 🔮", team: "Villager", description: "Mỗi đêm kiểm tra phe của 1 người.", nightAbility: true, order: 20 },
     BODYGUARD: { name: "Bảo Vệ 🛡️", team: "Villager", description: "Mỗi đêm bảo vệ 1 người (không trùng lặp).", nightAbility: true, order: 30 },
+    MAYOR: { name: "Thị Trưởng 👑", team: "Villager", description: "Có 2 phiếu bầu và quyền quyết định trong trường hợp hòa.", nightAbility: false, order: 40 }, // Vai trò MỚI
     VILLAGER: { name: "Dân Làng 🧑", team: "Villager", description: "Không có năng lực đặc biệt.", nightAbility: false, order: 99 },
 };
 
 const NIGHT_DURATION = 90 * 1000; // 90 giây cho đêm
+// ĐÃ SỬA: 60 giây cho thảo luận theo yêu cầu
+const DAY_DISCUSSION_DURATION = 60 * 1000; 
 const DAY_VOTE_DURATION = 5 * 60 * 1000; // 5 phút cho bỏ phiếu ngày
 
 // --- CHIA VAI TRÒ ---
 /**
- * Giả lập logic chia vai trò đơn giản (chỉ đảm bảo code chạy).
+ * Giả lập logic chia vai trò đơn giản.
  * @param {object} game - Đối tượng game.
  * @returns {Map<string, string> | null} - Map vai trò được gán hoặc null nếu không đủ người.
  */
 function assignRoles(game) {
-    // Cần thêm thuộc tính dayVoteCounts vào game object để đếm phiếu dễ hơn
+    // Khởi tạo/reset trạng thái bỏ phiếu cho game mới
     game.dayVoteCounts = {};
-    
+    game.lastProtectedId = null;
+    game.threadId = null; // Reset thread ID
+    game.tieBreakerMessageId = null; // Reset message ID quyết định của Thị Trưởng
+
     if (game.players.size < 8) return null;
 
     const rolesList = [];
-    // Phân bổ vai trò (2 Sói, 1 Tiên Tri, 1 Bảo Vệ, còn lại Dân)
-    rolesList.push('WEREWOLF', 'WEREWOLF', 'SEER', 'BODYGUARD');
+    // Phân bổ vai trò (2 Sói, 1 Tiên Tri, 1 Bảo Vệ, 1 Thị Trưởng, còn lại Dân)
+    rolesList.push('WEREWOLF', 'WEREWOLF', 'SEER', 'BODYGUARD', 'MAYOR');
     while (rolesList.length < game.players.size) {
         rolesList.push('VILLAGER');
     }
@@ -55,28 +62,35 @@ async function advanceToNight(game, client) {
     game.day += 1; 
     game.dayVotes.clear(); 
     game.nightActions.clear(); 
-    // Xóa ID message vote cũ (nếu có)
     game.currentVoteMessageId = null;
+    game.dayVoteCounts = {}; // Xóa đếm phiếu
+    game.tieBreakerMessageId = null; // Reset message ID quyết định của Thị Trưởng
 
     const channel = await client.channels.fetch(game.channelId);
+    if (!channel) return;
 
     // Khóa kênh chat
-    await channel.permissionOverwrites.edit(channel.guild.roles.everyone, { SendMessages: false });
-
-    // Try to create a dedicated thread for this game (one thread per game)
-    try {
-        if (!game.threadId) {
-            const threadName = `Ma Sói • ${channel.name} • Ngày ${game.day}`;
-            const thread = await channel.threads.create({ name: threadName, autoArchiveDuration: 1440, reason: 'Tạo thread cho game Ma Sói' }).catch(e => { throw e; });
-            game.threadId = thread.id;
-            // Post initial message in thread
-            await thread.send(`🔔 Thread thông báo cho trò chơi Ma Sói — Ngày ${game.day}.`);
-        }
-    } catch (threadErr) {
-        console.warn('Không thể tạo thread cho game Ma Sói (thiếu quyền hoặc lỗi):', threadErr && threadErr.message ? threadErr.message : threadErr);
+    if (channel.guild.roles.everyone) {
+        await channel.permissionOverwrites.edit(channel.guild.roles.everyone, { SendMessages: false });
     }
 
-    await channel.send(`🌑 **ĐÊM THỨ ${game.day} đã đến!** Kênh chat đã bị khóa. Kiểm tra DM để thực hiện hành động.`);
+    let thread = null;
+    try {
+        if (game.threadId) {
+            thread = await client.channels.fetch(game.threadId);
+        }
+        if (!thread) {
+            const threadName = `Ma Sói • Ngày ${game.day}`;
+            thread = await channel.threads.create({ name: threadName, autoArchiveDuration: 1440, reason: 'Tạo thread cho game Ma Sói' }).catch(e => { throw e; });
+            game.threadId = thread.id;
+            await thread.send(`🔔 **Thread thông báo game** đã được tạo. Các thông báo ngày/đêm sẽ ở đây.`);
+        } else {
+            await thread.send(`🌑 **ĐÊM THỨ ${game.day} đã đến!** Kênh chat đã bị khóa. Kiểm tra DM để thực hiện hành động.`);
+        }
+    } catch (threadErr) {
+        console.warn('Không thể tạo/truy cập thread:', threadErr.message);
+        await channel.send(`🌑 **ĐÊM THỨ ${game.day} đã đến!** Kênh chat đã bị khóa. Kiểm tra DM để thực hiện hành động. (⚠️ Không thể tạo Thread)`);
+    }
 
     // Gửi DM hành động
     handleNightActions(game, client);
@@ -105,7 +119,6 @@ async function handleNightActions(game, client) {
         try {
             const user = await client.users.fetch(player.id);
             
-            // Lọc bỏ chính mình khỏi danh sách mục tiêu nếu không phải Sói
             let currentOptions = playerOptions;
             if (roleKey !== 'WEREWOLF') {
                 currentOptions = playerOptions.filter(opt => opt.value !== player.id);
@@ -117,8 +130,8 @@ async function handleNightActions(game, client) {
             }
 
             if (currentOptions.length === 0) {
-                 await user.send({ content: `**${role.name}**! Đêm thứ ${game.day}. Bạn không có mục tiêu hợp lệ để chọn đêm nay.` });
-                 continue;
+                await user.send({ content: `**${role.name}**! Đêm thứ ${game.day}. Bạn không có mục tiêu hợp lệ để chọn đêm nay.` });
+                continue;
             }
 
             const selectMenu = new SelectMenuBuilder()
@@ -131,7 +144,7 @@ async function handleNightActions(game, client) {
             let dmContent = `**${role.name}**! Đêm thứ ${game.day}. Vui lòng chọn mục tiêu của bạn.`;
             
             if (roleKey === 'BODYGUARD' && game.lastProtectedId) {
-                 dmContent += `\n*⚠️ Lưu ý: Bạn không thể bảo vệ <@${game.lastProtectedId}> đêm nay.*`;
+                dmContent += `\n*⚠️ Lưu ý: Bạn không thể bảo vệ <@${game.lastProtectedId}> đêm nay.*`;
             }
             
             await user.send({
@@ -145,8 +158,9 @@ async function handleNightActions(game, client) {
     
     // Thiết lập bộ đếm giờ cho đêm
     setTimeout(async () => {
+        // Chỉ xử lý kết quả đêm nếu game vẫn đang ở trạng thái night
         if (game.status === 'night') {
-             await processNightResults(game, client);
+            await processNightResults(game, client);
         }
     }, NIGHT_DURATION);
 }
@@ -166,14 +180,18 @@ async function processNightResults(game, client) {
     let seerPerformerId = actions.get('SEER')?.performerId;
 
     let message = "";
+    const channel = await client.channels.fetch(game.channelId);
+    let thread = game.threadId ? await client.channels.fetch(game.threadId).catch(() => null) : null;
+    
+    if (!channel) return;
 
     // 1. Xử lý Tiên Tri (Gửi kết quả qua DM)
     if (seerTargetId && seerPerformerId) {
         const targetRoleKey = game.roles.get(seerTargetId);
         const targetTeam = ROLES[targetRoleKey]?.team || 'Unknown';
         try {
-            const targetUser = await client.users.fetch(seerPerformerId);
-            await targetUser.send(`🔮 Kết quả soi vai người chơi <@${seerTargetId}>: Họ thuộc phe **${targetTeam === 'Werewolf' ? 'Ma Sói' : 'Dân Làng'}**.`);
+            const user = await client.users.fetch(seerPerformerId);
+            await user.send(`🔮 Kết quả soi người chơi <@${seerTargetId}>: Họ thuộc phe **${targetTeam === 'Werewolf' ? 'Ma Sói' : 'Dân Làng'}**.`);
         } catch (e) { console.error('Lỗi gửi DM kết quả soi:', e); }
     }
 
@@ -199,17 +217,371 @@ async function processNightResults(game, client) {
     game.status = 'day';
     game.lastProtectedId = protectedId; // Lưu lại người được bảo vệ lần trước (dùng cho Bodyguard)
 
-    const channel = await client.channels.fetch(game.channelId);
-    await channel.permissionOverwrites.edit(channel.guild.roles.everyone, { SendMessages: true });
+    // Mở khóa kênh chat
+    if (channel.guild.roles.everyone) {
+        await channel.permissionOverwrites.edit(channel.guild.roles.everyone, { SendMessages: true });
+    }
     
+    // Gửi thông báo bình minh
     await channel.send(`☀️ **Bình Minh đã tới! Ngày thứ ${game.day} bắt đầu.**\n\n${message}`);
+    if (thread) {
+        await thread.send(`☀️ **Bình Minh đã tới!** Kẻ xấu số: ${victim ? `<@${victim.id}>` : 'Không có ai'}.`);
+    }
     
     // 4. Kiểm tra điều kiện thắng
     if (checkWinCondition(game, channel)) return;
 
-    // 5. Gửi tùy chọn bỏ phiếu treo cổ bằng nút
+    // 5. Bắt đầu giai đoạn Thảo luận/Vote
+    await startDay(game, client);
+}
+
+// --- BẮT ĐẦU GIAI ĐOẠN NGÀY (Thảo luận -> Vote) ---
+/**
+ * Bắt đầu giai đoạn ngày, bao gồm Thảo luận và sau đó là Vote Treo cổ.
+ * @param {object} game - Đối tượng game.
+ * @param {Client} client - Discord client.
+ */
+async function startDay(game, client) {
+    const channel = await client.channels.fetch(game.channelId);
+    
+    // Giai đoạn 1: THẢO LUẬN
+    const discussionEmbed = new EmbedBuilder()
+        .setTitle(`💬 Ngày ${game.day} Bắt Đầu: Thời Gian Thảo Luận`)
+        .setDescription("Thời gian để thảo luận, đưa ra nghi ngờ và bảo vệ bản thân. Kênh chat đã được mở khóa.")
+        .setFooter({ text: `⏱️ Thời gian thảo luận: ${DAY_DISCUSSION_DURATION / 1000} giây` }) 
+        .setColor("#2ECC71");
+        
+    await channel.send({ embeds: [discussionEmbed] });
+    
+    // Chờ hết thời gian Thảo luận
+    await new Promise(resolve => setTimeout(resolve, DAY_DISCUSSION_DURATION)); 
+    
+    // Giai đoạn 2: BỎ PHIẾU TREO CỔ
+    await channel.send("🗳️ **HẾT THỜI GIAN THẢO LUẬN!** Bắt đầu bỏ phiếu treo cổ. Sử dụng các nút bên dưới!");
     await sendDayVoteOptions(game, channel);
 }
+
+// --- GỬI TÙY CHỌN BỎ PHIẾU TREO CỔ (BUTTON) ---
+/**
+ * Gửi message với các nút cho phép người chơi bỏ phiếu treo cổ.
+ * @param {object} game - Đối tượng game.
+ * @param {Channel} channel - Kênh game.
+ */
+async function sendDayVoteOptions(game, channel) {
+    const alivePlayers = Array.from(game.players.values()).filter(p => p.isAlive);
+    const totalAlive = alivePlayers.length;
+    const neededVotes = Math.floor(totalAlive / 2) + 1;
+    
+    // Reset phiếu bầu cho ngày mới
+    game.dayVotes = new Map();
+    game.dayVoteCounts = {};
+
+    let voteMessage = `🗳️ **THỜI GIAN BỎ PHIẾU TREO CỔ!**\n` +
+                        `Thời gian còn lại: **${DAY_VOTE_DURATION / 60000} phút**.\n` +
+                        `Cần **${neededVotes}** phiếu để treo cổ.`;
+
+    const playerButtons = alivePlayers.map(p => 
+        new ButtonBuilder()
+            .setCustomId(`masoi_day_vote_${p.id}`) // masoi_day_vote_<targetId>
+            .setLabel(p.username)
+            .setStyle(ButtonStyle.Secondary)
+    );
+
+    const rows = [];
+    // Chia nút thành các hàng (mỗi hàng tối đa 5 nút)
+    for (let i = 0; i < playerButtons.length; i += 5) {
+        const row = new ActionRowBuilder().addComponents(playerButtons.slice(i, i + 5));
+        rows.push(row);
+    }
+    
+    // Gửi message và lưu ID để cập nhật số phiếu
+    const voteMsg = await channel.send({ 
+        content: voteMessage, 
+        components: rows 
+    });
+    
+    // Lưu ID của message bỏ phiếu vào game state để cập nhật sau
+    game.currentVoteMessageId = voteMsg.id; 
+    
+    const initialEmbed = new EmbedBuilder()
+        .setTitle('⚖️ Kết Quả Bỏ Phiếu Hiện Tại')
+        .setColor('#FFA500')
+        .setDescription(`Cần **${neededVotes}** phiếu để treo cổ một người chơi. (Tổng người còn sống: ${totalAlive})`)
+        .addFields({ name: 'Chưa có phiếu bầu', value: 'Hãy bỏ phiếu bằng các nút bên trên!' });
+
+    await voteMsg.edit({ embeds: [initialEmbed] });
+
+
+    // Thiết lập bộ đếm giờ kết thúc Ngày nếu không đủ phiếu treo cổ
+    setTimeout(async () => {
+        // Chỉ chạy nếu game vẫn đang ở trạng thái 'day'
+        if (game.status === 'day') {
+            const highestVotes = Math.max(...Object.values(game.dayVoteCounts), 0);
+            if (highestVotes < neededVotes) {
+                // Nếu số phiếu cao nhất không đạt ngưỡng, kết thúc ngày
+                await endDayNoLynch(game, channel, voteMsg.client); 
+            }
+        }
+    }, DAY_VOTE_DURATION);
+}
+
+
+// --- XỬ LÝ BỎ PHIẾU NGÀY (BUTTON INTERACTION) ---
+/**
+ * Xử lý khi một người chơi bỏ phiếu treo cổ bằng nút.
+ * @param {object} game - Đối tượng game.
+ * @param {string} voterId - ID của người bỏ phiếu.
+ * @param {string} targetId - ID của người bị bỏ phiếu.
+ * @param {Client} client - Discord client.
+ * @param {Interaction} interaction - Tương tác button.
+ */
+async function processDayVote(game, voterId, targetId, client, interaction) {
+    const channel = await client.channels.fetch(game.channelId);
+    
+    // 1. Kiểm tra tính hợp lệ của người bỏ phiếu và mục tiêu
+    if (!game.players.has(voterId) || !game.players.get(voterId).isAlive) {
+        return interaction.reply({ content: "❌ Bạn đã chết hoặc không tham gia game này.", ephemeral: true });
+    }
+    if (!game.players.has(targetId) || !game.players.get(targetId).isAlive) {
+        // Điều này không nên xảy ra nếu nút được tạo đúng
+        return interaction.reply({ content: "❌ Người chơi này đã chết hoặc không có trong game.", ephemeral: true });
+    }
+
+    const voterRole = game.roles.get(voterId);
+    const voteWeight = voterRole === 'MAYOR' ? 2 : 1; // Thị Trưởng có 2 phiếu
+
+    // 2. Lưu phiếu bầu
+    const oldTargetId = game.dayVotes.get(voterId);
+    
+    // Nếu người chơi bỏ phiếu cho cùng một người, bỏ phiếu bị hủy (tức là rút lại phiếu)
+    if (oldTargetId === targetId) {
+        game.dayVoteCounts[oldTargetId] = (game.dayVoteCounts[oldTargetId] || voteWeight) - voteWeight;
+        if (game.dayVoteCounts[oldTargetId] < 0) game.dayVoteCounts[oldTargetId] = 0; 
+        game.dayVotes.delete(voterId);
+        await interaction.reply({ content: `✅ Bạn đã **rút lại** phiếu bầu cho **<@${targetId}>**.`, ephemeral: true });
+    } else {
+        // Nếu có phiếu cũ, giảm đếm
+        if (oldTargetId) {
+            game.dayVoteCounts[oldTargetId] = (game.dayVoteCounts[oldTargetId] || voteWeight) - voteWeight;
+            if (game.dayVoteCounts[oldTargetId] < 0) game.dayVoteCounts[oldTargetId] = 0; 
+        }
+        
+        // Lưu phiếu mới và tăng đếm
+        game.dayVotes.set(voterId, targetId);
+        game.dayVoteCounts[targetId] = (game.dayVoteCounts[targetId] || 0) + voteWeight;
+        await interaction.reply({ content: `✅ Bạn đã bỏ phiếu cho **<@${targetId}>** (${voteWeight} phiếu).`, ephemeral: true });
+    }
+
+    // 3. Chuẩn bị dữ liệu kiểm tra lynch
+    const alivePlayers = Array.from(game.players.values()).filter(p => p.isAlive);
+    const totalAlive = alivePlayers.length;
+    const neededVotes = Math.floor(totalAlive / 2) + 1; 
+    
+    let highestVotes = 0;
+    let highestVotedId = null;
+    let tiedVotedIds = []; 
+
+    for (const [id, count] of Object.entries(game.dayVoteCounts)) {
+        if (count > highestVotes) {
+            highestVotes = count;
+            highestVotedId = id;
+            tiedVotedIds = [id];
+        } else if (count === highestVotes && highestVotes > 0) {
+            tiedVotedIds.push(id);
+        }
+    }
+    
+    // 4. Cập nhật message bỏ phiếu (embed)
+    const voteEmbed = new EmbedBuilder()
+        .setTitle('⚖️ Kết Quả Bỏ Phiếu Hiện Tại')
+        .setColor('#FFA500')
+        .setDescription(`Cần **${neededVotes}** phiếu để treo cổ một người chơi.`);
+
+    // Lọc ra người chơi còn sống đang có phiếu bầu 
+    const sortedVotes = Object.entries(game.dayVoteCounts)
+        .filter(([id]) => game.players.get(id)?.isAlive && game.dayVoteCounts[id] > 0) // Chỉ hiển thị người còn sống và có phiếu > 0
+        .map(([id, count]) => ({ id, count }))
+        .sort((a, b) => b.count - a.count);
+
+    if (sortedVotes.length > 0) {
+        const voteText = sortedVotes.map(vote => 
+            `**<@${vote.id}>**: ${vote.count} phiếu`
+        ).join('\n');
+        
+        voteEmbed.addFields({ name: `Danh sách phiếu bầu (Tổng người còn sống: ${totalAlive})`, value: voteText });
+    } else {
+        voteEmbed.addFields({ name: 'Chưa có phiếu bầu', value: 'Hãy bỏ phiếu!' });
+    }
+    
+    if (game.currentVoteMessageId) {
+        try {
+            const voteMsg = await channel.messages.fetch(game.currentVoteMessageId);
+            await voteMsg.edit({ embeds: [voteEmbed] });
+        } catch (e) {
+            console.error('Lỗi khi cập nhật message bỏ phiếu:', e);
+        }
+    }
+    
+    // 5. Kiểm tra đủ phiếu để treo cổ
+    if (highestVotedId && highestVotes >= neededVotes) {
+        
+        if (tiedVotedIds.length > 1) {
+            // Trường hợp hòa -> GỌI THỊ TRƯỞNG QUYẾT ĐỊNH
+            const mayorEntry = Array.from(game.roles.entries()).find(([, roleKey]) => roleKey === 'MAYOR');
+            const mayorId = mayorEntry ? mayorEntry[0] : null;
+            const mayorIsAlive = mayorId && game.players.get(mayorId)?.isAlive;
+
+            if (mayorIsAlive) {
+                // Gửi tùy chọn quyết định cho Thị Trưởng
+                await sendTieBreakerOptions(game, channel, tiedVotedIds, mayorId);
+                return; // Dừng processDayVote, chờ quyết định của Thị Trưởng
+            } else {
+                // Không có Thị Trưởng còn sống hoặc không có Thị Trưởng
+                await channel.send(`🗳️ **Vote Hòa!** Các ứng viên: ${tiedVotedIds.map(id => `<@${id}>`).join(', ')}. Do **Thị Trưởng đã chết** hoặc không có, không ai bị treo cổ. Mọi người được tha!`);
+                await endDayNoLynch(game, channel, client); 
+                return;
+            }
+        }
+
+        // Trường hợp THẮNG TUYỆT ĐỐI (Logic cũ)
+        const hangedId = highestVotedId;
+        const hangedRoleKey = game.roles.get(hangedId);
+        const hangedRole = ROLES[hangedRoleKey] || { name: 'Vai trò ẩn', team: 'Unknown' };
+
+        // Cập nhật trạng thái người chơi
+        if (game.players.has(hangedId)) {
+            game.players.get(hangedId).isAlive = false;
+        }
+        
+        await channel.send(
+            `🔨 **Đã có đủ ${neededVotes} phiếu!** Người bị treo cổ là **<@${hangedId}>**!\n` +
+            `😭 Họ là **${hangedRole.name}**. ` + 
+            (hangedRole.team === 'Werewolf' ? 'MA SÓI ĐÃ BỊ LOẠI! 🎉' : 'DÂN LÀNG ĐÃ BỊ GIẾT NHẦM! 💔')
+        );
+        
+        // Vô hiệu hóa nút bỏ phiếu
+        if (game.currentVoteMessageId) {
+            try {
+                const voteMsg = await channel.messages.fetch(game.currentVoteMessageId);
+                const disabledComponents = voteMsg.components.map(row => {
+                    const r = row.toJSON();
+                    r.components = r.components.map(c => ({
+                           ...c,
+                           disabled: true,
+                           style: (c.custom_id && String(c.custom_id).endsWith(hangedId)) ? ButtonStyle.Danger : ButtonStyle.Secondary
+                    }));
+                    return r;
+                });
+                voteEmbed.setDescription(`Người bị treo cổ: **<@${hangedId}>** - **${hangedRole.name}**.`);
+                await voteMsg.edit({ embeds: [voteEmbed], components: disabledComponents }).catch(()=>{});
+            } catch (err) {
+                console.error('Lỗi khi vô hiệu hóa nút bỏ phiếu:', err);
+            }
+        }
+        
+        // 6. Kết thúc Ngày và chuyển sang Đêm
+        game.dayVotes.clear(); 
+        game.dayVoteCounts = {}; 
+
+        // Kiểm tra thắng thua
+        if (!checkWinCondition(game, channel)) {
+            await advanceToNight(game, client); 
+        }
+
+    }
+}
+
+// --- LOGIC GIẢI QUYẾT HÒA CỦA THỊ TRƯỞNG ---
+
+/**
+ * Gửi tùy chọn quyết định cho Thị Trưởng khi xảy ra hòa.
+ * @param {object} game - Đối tượng game.
+ * @param {Channel} channel - Kênh game.
+ * @param {string[]} tiedVotedIds - Mảng ID người bị hòa phiếu.
+ * @param {string} mayorId - ID của Thị Trưởng.
+ */
+async function sendTieBreakerOptions(game, channel, tiedVotedIds, mayorId) {
+    
+    // Vô hiệu hóa nút bỏ phiếu cũ để không ai vote nữa
+    try {
+        const voteMsg = await channel.messages.fetch(game.currentVoteMessageId);
+        const disabledComponents = voteMsg.components.map(row => {
+             const r = row.toJSON();
+             r.components = r.components.map(c => ({ ...c, disabled: true }));
+             return r;
+        });
+        await voteMsg.edit({ components: disabledComponents });
+    } catch (e) {
+        console.error('Lỗi vô hiệu hóa tin nhắn vote:', e);
+    }
+    
+    const tieEmbed = new EmbedBuilder()
+        .setTitle('⚡ Vote Hòa - Thị Trưởng Quyết Định!')
+        .setDescription(`Các người chơi sau có cùng số phiếu cao nhất:\n${tiedVotedIds.map(id => `• <@${id}>`).join('\n')}\n\n👑 **Thị Trưởng** <@${mayorId}>: Hãy chọn người duy nhất bị treo cổ.`)
+        .setColor('#FFA500');
+
+    const tieRow = new ActionRowBuilder().addComponents(
+        tiedVotedIds.map(id => 
+            new ButtonBuilder()
+                // customId: masoi_mayor_tie_<channelId>_<targetId>
+                // ĐÃ SỬA: Thêm channelId vào customId để xử lý trong component handler
+                .setCustomId(`masoi_mayor_${game.channelId}_${id}`) 
+                .setLabel(game.players.get(id)?.username || id)
+                .setStyle(ButtonStyle.Danger)
+        )
+    );
+    
+    // Gửi tin nhắn quyết định cho Thị Trưởng
+    const tieMsg = await channel.send({ 
+        content: `👑 **CHỈ THỊ TRƯỞNG** <@${mayorId}> mới có thể quyết định!`, 
+        embeds: [tieEmbed], 
+        components: [tieRow] 
+    });
+    game.tieBreakerMessageId = tieMsg.id; // Lưu ID để xử lý tương tác
+}
+
+/**
+ * Xử lý hành động quyết định treo cổ của Thị Trưởng sau khi hòa.
+ * @param {object} game - Đối tượng game.
+ * @param {string} hangedId - ID người bị Thị Trưởng chọn treo cổ.
+ * @param {Client} client - Discord client.
+ * @param {Interaction} interaction - Tương tác button.
+ */
+async function processMayorDecision(game, hangedId, client, interaction) {
+    const channel = await client.channels.fetch(game.channelId);
+    
+    // 1. Cập nhật trạng thái người chơi
+    if (game.players.has(hangedId)) {
+        game.players.get(hangedId).isAlive = false;
+    }
+    
+    const hangedRoleKey = game.roles.get(hangedId);
+    const hangedRole = ROLES[hangedRoleKey] || { name: 'Vai trò ẩn', team: 'Unknown' };
+
+    // 2. Vô hiệu hóa nút quyết định của Thị Trưởng
+    await interaction.update({ 
+        content: `👑 **THỊ TRƯỞNG ĐÃ QUYẾT ĐỊNH!** Người bị treo cổ: **<@${hangedId}>**.`,
+        components: [] 
+    });
+    
+    // 3. Thông báo kết quả
+    await channel.send(
+        `🔨 **QUYẾT ĐỊNH CUỐI CÙNG CỦA THỊ TRƯỞNG!** Người bị treo cổ là **<@${hangedId}>**!\n` +
+        `😭 Họ là **${hangedRole.name}**. ` + 
+        (hangedRole.team === 'Werewolf' ? 'MA SÓI ĐÃ BỊ LOẠI! 🎉' : 'DÂN LÀNG ĐÃ BỊ GIẾT NHẦM! 💔')
+    );
+    
+    // 4. Reset trạng thái
+    game.dayVotes.clear(); 
+    game.dayVoteCounts = {}; 
+    game.tieBreakerMessageId = null;
+
+    // 5. Kiểm tra thắng thua và chuyển đêm
+    if (!checkWinCondition(game, channel)) {
+        await advanceToNight(game, client); 
+    }
+}
+
 
 // --- KIỂM TRA ĐIỀU KIỆN THẮNG ---
 /**
@@ -236,7 +608,7 @@ function checkWinCondition(game, channel) {
     if (winMessage) {
         game.status = 'finished';
         activeWerewolfGames.delete(game.channelId); 
-        channel.send(`--- **TRÒ CHƠI KẾT THÚC** ---\n${winMessage}\n\n/masoi guide để xem lại luật chơi!`);
+        channel.send(`--- **TRÒ CHƠI KẾT THÚC** ---\n${winMessage}\n\n/masoi help để xem lại hướng dẫn!`);
         return true;
     }
     return false;
@@ -247,6 +619,7 @@ function checkWinCondition(game, channel) {
  * Sử dụng khi hết giờ hoặc có hòa mà không lynch được ai.
  * @param {object} game - Đối tượng game.
  * @param {Channel} channel - Kênh game.
+ * @param {Client} client - Discord client.
  */
 async function endDayNoLynch(game, channel, client) {
     if (game.status !== 'day' || !game.currentVoteMessageId) return;
@@ -267,7 +640,7 @@ async function endDayNoLynch(game, channel, client) {
             .setDescription('Thời gian đã hết! Không có người chơi nào đạt đủ số phiếu để bị treo cổ.');
 
         // Gửi thông báo kết thúc ngày
-        await channel.send('😴 **Buổi thảo luận kết thúc.** Không có ai bị treo cổ. Đêm lại đến!');
+        await channel.send('😴 **Buổi bỏ phiếu kết thúc.** Không có ai bị treo cổ. Đêm lại đến!');
         await voteMsg.edit({ embeds: [noLynchEmbed], components: disabledComponents });
 
     } catch (e) {
@@ -277,217 +650,6 @@ async function endDayNoLynch(game, channel, client) {
     // Kiểm tra lại lần cuối trước khi chuyển đêm
     if (!checkWinCondition(game, channel)) {
         await advanceToNight(game, client);
-    }
-}
-
-
-// --- GỬI TÙY CHỌN BỎ PHIẾU TREO CỔ (BUTTON) ---
-/**
- * Gửi message với các nút cho phép người chơi bỏ phiếu treo cổ.
- * @param {object} game - Đối tượng game.
- * @param {Channel} channel - Kênh game.
- */
-async function sendDayVoteOptions(game, channel) {
-    const alivePlayers = Array.from(game.players.values()).filter(p => p.isAlive);
-    const totalAlive = alivePlayers.length;
-    const neededVotes = Math.floor(totalAlive / 2) + 1;
-    
-    // Reset phiếu bầu cho ngày mới
-    game.dayVotes = new Map();
-    game.dayVoteCounts = {};
-
-    let voteMessage = `🗣️ **THỜI GIAN THẢO LUẬN & BỎ PHIẾU TREO CỔ!**\n` +
-                      `Thời gian còn lại: **${DAY_VOTE_DURATION / 60000} phút**.\n` +
-                      `Hãy chọn người bạn nghi ngờ là Ma Sói. Cần **${neededVotes}** phiếu để treo cổ.`;
-
-    const playerButtons = alivePlayers.map(p => 
-        new ButtonBuilder()
-            .setCustomId(`masoi_day_vote_${p.id}`) // masoi_day_vote_<targetId>
-            .setLabel(p.username)
-            .setStyle(ButtonStyle.Secondary)
-    );
-
-    const rows = [];
-    // Chia nút thành các hàng (mỗi hàng tối đa 5 nút)
-    for (let i = 0; i < playerButtons.length; i += 5) {
-        const row = new ActionRowBuilder().addComponents(playerButtons.slice(i, i + 5));
-        rows.push(row);
-    }
-    
-    // Gửi message và lưu ID để cập nhật số phiếu
-    const voteMsg = await channel.send({ 
-        content: voteMessage, 
-        components: rows 
-    });
-    
-    // Lưu ID của message bỏ phiếu vào game state để cập nhật sau
-    game.currentVoteMessageId = voteMsg.id; 
-
-    // Thiết lập bộ đếm giờ kết thúc Ngày nếu không đủ phiếu treo cổ
-    setTimeout(async () => {
-        // Chỉ chạy nếu game vẫn đang ở trạng thái 'day' và chưa có ai bị lynch
-        if (game.status === 'day') {
-            const highestVotes = Math.max(...Object.values(game.dayVoteCounts), 0);
-            if (highestVotes < neededVotes) {
-                // Nếu số phiếu cao nhất không đạt ngưỡng, kết thúc ngày
-                await endDayNoLynch(game, channel, voteMsg.client); 
-            }
-        }
-    }, DAY_VOTE_DURATION);
-}
-
-
-// --- XỬ LÝ BỎ PHIẾU NGÀY ---
-/**
- * Xử lý khi một người chơi bỏ phiếu treo cổ bằng nút.
- * @param {object} game - Đối tượng game.
- * @param {string} voterId - ID của người bỏ phiếu.
- * @param {string} targetId - ID của người bị bỏ phiếu.
- * @param {Client} client - Discord client.
- * @param {Interaction} interaction - Tương tác button.
- */
-async function processDayVote(game, voterId, targetId, client, interaction) {
-    const channel = await client.channels.fetch(game.channelId);
-    
-    // 1. Kiểm tra tính hợp lệ của người bỏ phiếu và mục tiêu
-    if (!game.players.has(voterId) || !game.players.get(voterId).isAlive) {
-        return interaction.reply({ content: "❌ Bạn đã chết hoặc không tham gia game này.", ephemeral: true });
-    }
-    if (!game.players.has(targetId) || !game.players.get(targetId).isAlive) {
-        return interaction.reply({ content: "❌ Người chơi này đã chết hoặc không có trong game.", ephemeral: true });
-    }
-    // Gỡ bỏ kiểm tra tự vote để cho phép người chơi tự bỏ phiếu cho mình (một số luật cho phép)
-    // if (voterId === targetId) {
-    //     return interaction.reply({ content: "❌ Bạn không thể tự bỏ phiếu cho chính mình!", ephemeral: true });
-    // }
-
-    // 2. Lưu phiếu bầu
-    const oldTargetId = game.dayVotes.get(voterId);
-
-    // Nếu có phiếu cũ, giảm đếm
-    if (oldTargetId) {
-        game.dayVoteCounts[oldTargetId] = (game.dayVoteCounts[oldTargetId] || 1) - 1;
-        if (game.dayVoteCounts[oldTargetId] < 0) game.dayVoteCounts[oldTargetId] = 0; 
-    }
-    
-    // Lưu phiếu mới và tăng đếm
-    game.dayVotes.set(voterId, targetId);
-    game.dayVoteCounts[targetId] = (game.dayVoteCounts[targetId] || 0) + 1;
-
-
-    // 3. Thông báo cá nhân
-    await interaction.reply({ content: `✅ Bạn đã bỏ phiếu cho **<@${targetId}>**.`, ephemeral: true });
-    
-    // 4. Kiểm tra điều kiện đủ phiếu
-    const alivePlayers = Array.from(game.players.values()).filter(p => p.isAlive);
-    const totalAlive = alivePlayers.length;
-    const neededVotes = Math.floor(totalAlive / 2) + 1; 
-    
-    let highestVotes = 0;
-    let highestVotedId = null;
-    let tiedVotedIds = []; // Danh sách người có số phiếu cao nhất bằng nhau
-
-    // Tìm người có số phiếu cao nhất và kiểm tra hòa
-    for (const [id, count] of Object.entries(game.dayVoteCounts)) {
-        if (count > highestVotes) {
-            highestVotes = count;
-            highestVotedId = id;
-            tiedVotedIds = [id]; // Reset và bắt đầu với người mới
-        } else if (count === highestVotes && highestVotes > 0) {
-            tiedVotedIds.push(id); // Phát hiện hòa
-        }
-    }
-    
-    // 5. Cập nhật message bỏ phiếu (thông báo kết quả hiện tại)
-    const voteEmbed = new EmbedBuilder()
-        .setTitle('⚖️ Kết Quả Bỏ Phiếu Hiện Tại')
-        .setColor('#FFA500')
-        .setDescription(`Cần **${neededVotes}** phiếu để treo cổ một người chơi.`);
-
-    // Chuyển voteCounts thành danh sách và sắp xếp
-    const sortedVotes = Object.entries(game.dayVoteCounts)
-        .map(([id, count]) => ({ id, count }))
-        .sort((a, b) => b.count - a.count);
-
-    if (sortedVotes.length > 0) {
-        const voteText = sortedVotes.map(vote => 
-            `**<@${vote.id}>**: ${vote.count} phiếu`
-        ).join('\n');
-        
-        voteEmbed.addFields({ name: `Danh sách phiếu bầu (Tổng người còn sống: ${totalAlive})`, value: voteText });
-    } else {
-        voteEmbed.addFields({ name: 'Chưa có phiếu bầu', value: 'Hãy bỏ phiếu!' });
-    }
-    
-    // Cập nhật message
-    if (game.currentVoteMessageId) {
-        try {
-            const voteMsg = await channel.messages.fetch(game.currentVoteMessageId);
-            await voteMsg.edit({ embeds: [voteEmbed] });
-        } catch (e) {
-            console.error('Lỗi khi cập nhật message bỏ phiếu:', e);
-        }
-    }
-    
-    
-    // 6. Kiểm tra đủ phiếu để treo cổ
-    if (highestVotedId && highestVotes >= neededVotes) {
-        
-        if (tiedVotedIds.length > 1) {
-            // Trường hợp hòa, lynch bị dừng lại.
-            await channel.send("⚠️ **KẾT QUẢ HÒA!** Có nhiều người chơi đạt số phiếu cao nhất (bằng hoặc vượt ngưỡng). Cần thêm thảo luận/một phiếu bầu quyết định.");
-            // Giữ trạng thái 'day' và không làm gì cả, đợi hết giờ (endDayNoLynch sẽ xử lý)
-            return;
-        }
-
-
-        const hangedId = highestVotedId;
-        const hangedRoleKey = game.roles.get(hangedId);
-        const hangedRole = ROLES[hangedRoleKey] || { name: 'Vai trò ẩn', team: 'Unknown' };
-
-        // Cập nhật trạng thái người chơi
-        if (game.players.has(hangedId)) {
-            game.players.get(hangedId).isAlive = false;
-        }
-        
-        await channel.send(
-            `🔨 **Đã có đủ ${neededVotes} phiếu!** Người bị treo cổ là **<@${hangedId}>**!\n` +
-            `😭 Họ là **${hangedRole.name}**. ` + 
-            (hangedRole.team === 'Werewolf' ? 'MA SÓI ĐÃ BỊ LOẠI! 🎉' : 'DÂN LÀNG ĐÃ BỊ GIẾT NHẦM! 💔')
-        );
-        
-        // 7. Kết thúc Ngày và chuyển sang Đêm
-        game.dayVotes.clear(); // Xóa phiếu bầu sau khi treo cổ
-        game.dayVoteCounts = {};
-
-        // Vô hiệu hóa nút bỏ phiếu
-        if (game.currentVoteMessageId) {
-             try {
-                 const voteMsg = await channel.messages.fetch(game.currentVoteMessageId);
-                 const disabledComponents = voteMsg.components.map(row => {
-                     const r = row.toJSON();
-                     // Đánh dấu nút của người bị lynch là màu đỏ (kiểm tra an toàn custom_id)
-                     r.components = r.components.map(c => ({
-                         ...c,
-                         disabled: true,
-                         style: (c.custom_id && String(c.custom_id).endsWith(hangedId)) ? ButtonStyle.Danger : c.style
-                     }));
-                     return r;
-                 });
-                 // Thêm embed kết quả cuối cùng trước khi chuyển đêm
-                 voteEmbed.setDescription(`Người bị treo cổ: **<@${hangedId}>** - **${hangedRole.name}**.`);
-                 await voteMsg.edit({ embeds: [voteEmbed], components: disabledComponents }).catch(()=>{});
-             } catch (err) {
-                 console.error('Lỗi khi vô hiệu hóa nút bỏ phiếu:', err);
-             }
-        }
-        
-        // Kiểm tra thắng thua
-        if (!checkWinCondition(game, channel)) {
-            // Nếu game chưa kết thúc, chuyển sang đêm mới
-            await advanceToNight(game, client); 
-        }
-
     }
 }
 
@@ -502,6 +664,9 @@ module.exports = {
     checkWinCondition,
     sendDayVoteOptions,
     processDayVote,
-    // Hàm mới
     endDayNoLynch,
+    // Hàm mới được export:
+    startDay,
+    sendTieBreakerOptions,
+    processMayorDecision,
 };

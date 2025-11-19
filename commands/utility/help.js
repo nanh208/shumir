@@ -5,7 +5,7 @@ module.exports = {
     .setName("help")
     .setDescription("📚 Xem danh sách lệnh hoặc thông tin chi tiết về các nhóm lệnh"),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     const embed = new EmbedBuilder()
       .setColor("#6CDBFF")
       .setTitle("📖 Danh sách lệnh Shumir — Tổng hợp")

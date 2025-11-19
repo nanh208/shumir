@@ -11,7 +11,7 @@ module.exports = {
         .setDescription('Lý do bạn AFK (tùy chọn)')
     ),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     const reason = interaction.options.getString('lydo') || 'Không có lý do cụ thể.';
     afkUsers.set(interaction.user.id, { reason, time: Date.now() });
 

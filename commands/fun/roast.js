@@ -17,7 +17,7 @@ module.exports = {
       option.setName("target").setDescription("Người bạn muốn châm chọc").setRequired(false)
     ),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     const target = interaction.options.getUser("target") || interaction.user;
     const roast = roasts[Math.floor(Math.random() * roasts.length)];
 

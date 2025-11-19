@@ -5,7 +5,7 @@ module.exports = {
     .setName('serverinfo')
     .setDescription('Xem thông tin chi tiết về server 🏰'),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     const { guild } = interaction;
     const embed = new EmbedBuilder()
       .setColor('Blue')

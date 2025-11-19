@@ -8,7 +8,7 @@ module.exports = {
     .setName("bxh")
     .setDescription("📊 Hiển thị bảng xếp hạng người chơi trong server này"),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     let scores = {};
     try {
       if (fs.existsSync(scoresFile)) {

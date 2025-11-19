@@ -11,7 +11,7 @@ module.exports = {
         .setMaxValue(100)
     ),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     const sides = interaction.options.getInteger('sides') || 6;
     const roll = Math.floor(Math.random() * sides) + 1;
     const embed = new EmbedBuilder()

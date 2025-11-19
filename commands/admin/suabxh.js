@@ -30,7 +30,7 @@ module.exports = {
         )
     ),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     const sub = interaction.options.getSubcommand();
     const user = interaction.options.getUser("user");
     const amount = interaction.options.getInteger("amount");

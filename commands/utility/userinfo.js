@@ -6,7 +6,7 @@ module.exports = {
     .setDescription('Xem thông tin chi tiết của một người dùng 👤')
     .addUserOption(option => option.setName('user').setDescription('Người cần xem')),
 
-  async execute(interaction) {
+  async execute(interaction, client, gameStates) {
     const user = interaction.options.getUser('user') || interaction.user;
     const member = await interaction.guild.members.fetch(user.id);
     const embed = new EmbedBuilder()
