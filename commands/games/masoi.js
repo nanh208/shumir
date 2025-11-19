@@ -327,9 +327,8 @@ module.exports = {
     async component(interaction, client, gameStates) {
         
         await interaction.deferUpdate().catch(() => {}); // Defer tất cả component interaction
-
         // Chỉ xử lý các tương tác đến từ game Ma Sói
-        if (!interaction.customId.startsWith('masoi_')) return;
+        if (!interaction.customId?.startsWith('masoi_')) return;
 
         const customId = interaction.customId || '';
         const parts = customId.split('_');
@@ -373,9 +372,12 @@ module.exports = {
         
         // JOIN
         if (action === 'join') {
-            if (game.status !== 'pending') return interaction.followUp({ content: '❌ Game đã bắt đầu, không thể tham gia.', ephemeral: true });
-            if (game.players.has(interaction.user.id)) return interaction.followUp({ content: 'Bạn đã ở trong phòng này rồi.', ephemeral: true });
-            if (game.players.size >= game.neededPlayers) return interaction.followUp({ content: '❌ Phòng đã đầy!', ephemeral: true });
+            if (game.status !== 'pending') return interaction.reply({ content: '❌ Game đã bắt đầu, không thể tham gia.', ephemeral: true }).catch(()=>{});
+            if (game.players.has(interaction.user.id)) return interaction.reply({ content: 'Bạn đã ở trong phòng này rồi.', ephemeral: true }).catch(()=>{});
+            if (game.players.size >= game.neededPlayers) return interaction.reply({ content: '❌ Phòng đã đầy!', ephemeral: true }).catch(()=>{});
+
+            // Acknowledge then update lobby message
+            await interaction.deferUpdate().catch(()=>{});
 
             game.players.set(interaction.user.id, { id: interaction.user.id, username: interaction.user.username, isAlive: true });
             
@@ -401,17 +403,16 @@ module.exports = {
 
         // LEAVE
         if (action === 'leave') {
-            if (!game.players.has(interaction.user.id)) return interaction.followUp({ content: 'Bạn không ở trong phòng này.', ephemeral: true });
-            
+            if (!game.players.has(interaction.user.id)) return interaction.reply({ content: 'Bạn không ở trong phòng này.', ephemeral: true }).catch(()=>{});
+            await interaction.deferUpdate().catch(()=>{});
             const isHost = game.gameMaster === interaction.user.id;
             game.players.delete(interaction.user.id);
-            
+
             if (game.players.size === 0) {
                  activeWerewolfGames.delete(game.channelId);
                  return interaction.message.edit({ content: '**Phòng chờ đã bị xóa vì không còn ai.**', embeds: [], components: [] }).catch(()=>{});
             }
-            
-            // Nếu host rời, chuyển quyền host cho người còn lại đầu tiên
+
             if (isHost) {
                 const newHostId = Array.from(game.players.keys())[0];
                 game.gameMaster = newHostId;
@@ -424,7 +425,8 @@ module.exports = {
             const components = interaction.message.components.map(row => {
                  const r = row.toJSON();
                  r.components = r.components.map(c => {
-                     if (c.custom_id === 'masoi_start') {
+                     const cid = c.custom_id || c.customId || c.custom_id;
+                     if (cid === 'masoi_start') {
                          return { ...c, disabled: game.players.size < 8 };
                      }
                      return c;
@@ -439,8 +441,11 @@ module.exports = {
 
         // START (Chuyển từ lobby sang game)
         if (action === 'start') {
-            if (game.gameMaster !== interaction.user.id) return interaction.followUp({ content: '❌ Chỉ host mới có thể bắt đầu game.', ephemeral: true });
-            if (game.players.size < 8) return interaction.followUp({ content: `❌ Cần ít nhất 8 người để bắt đầu. Hiện tại: ${game.players.size} người.`, ephemeral: true });
+            if (game.gameMaster !== interaction.user.id) return interaction.reply({ content: '❌ Chỉ host mới có thể bắt đầu game.', ephemeral: true }).catch(()=>{});
+            if (game.players.size < 8) return interaction.reply({ content: `❌ Cần ít nhất 8 người để bắt đầu. Hiện tại: ${game.players.size} người.`, ephemeral: true }).catch(()=>{});
+
+            // Acknowledge then send DMs
+            await interaction.deferUpdate().catch(()=>{});
 
             // Sử dụng hàm assignRoles từ werewolfLogic để xử lý việc chia vai
             const rolesAssigned = assignRoles(game);
@@ -479,9 +484,10 @@ module.exports = {
         // CANCEL
         if (action === 'cancel') {
              if (!game) {
+                 await interaction.deferUpdate().catch(()=>{});
                  return interaction.message.edit({ content: '**Tin nhắn này đã hết hạn.**', embeds: [], components: [] }).catch(()=>{});
              }
-             if (game.gameMaster !== interaction.user.id) return interaction.followUp({ content: 'Chỉ host có thể hủy game.', ephemeral: true });
+             if (game.gameMaster !== interaction.user.id) return interaction.reply({ content: 'Chỉ host có thể hủy game.', ephemeral: true }).catch(()=>{});
              
              activeWerewolfGames.delete(game.channelId);
              
@@ -504,19 +510,19 @@ module.exports = {
             // parts: [ 'masoi', 'action', '<channelId>', '<ROLE>' ]
             const targetChannelId = parts[2];
             const roleKey = parts[3];
-            const selected = interaction.values && interaction.values[0]; 
+              const selected = interaction.values && interaction.values[0]; 
 
-            if (!targetChannelId || !roleKey || !selected) return interaction.followUp({ content: '❌ Lựa chọn không hợp lệ.', ephemeral: true });
-            
-            const targetGame = game; // Đã được gán ở trên (lấy từ targetChannelId)
-            if (!targetGame || targetGame.status !== 'night') return interaction.followUp({ content: '❌ Game không còn tồn tại hoặc đang không phải Đêm.', ephemeral: true });
+              if (!targetChannelId || !roleKey || !selected) return interaction.reply({ content: '❌ Lựa chọn không hợp lệ.', ephemeral: true }).catch(()=>{});
 
-            if (targetGame.roles.get(interaction.user.id) !== roleKey) {
-                 return interaction.followUp({ content: '❌ Bạn không có vai trò này hoặc không được phép hành động lúc này.', ephemeral: true });
-            }
-            if (!targetGame.players.get(interaction.user.id)?.isAlive) {
-                 return interaction.followUp({ content: '❌ Người chết không thể hành động!', ephemeral: true });
-            }
+              const targetGame = game; // Đã được gán ở trên (lấy từ targetChannelId)
+              if (!targetGame || targetGame.status !== 'night') return interaction.reply({ content: '❌ Game không còn tồn tại hoặc đang không phải Đêm.', ephemeral: true }).catch(()=>{});
+
+              if (targetGame.roles.get(interaction.user.id) !== roleKey) {
+                  return interaction.reply({ content: '❌ Bạn không có vai trò này hoặc không được phép hành động lúc này.', ephemeral: true }).catch(()=>{});
+              }
+              if (!targetGame.players.get(interaction.user.id)?.isAlive) {
+                  return interaction.reply({ content: '❌ Người chết không thể hành động!', ephemeral: true }).catch(()=>{});
+              }
 
             // Xử lý cấm bảo vệ liên tiếp (Bodyguard)
             if (roleKey === 'BODYGUARD' && targetGame.lastProtectedId === selected) {
@@ -550,12 +556,22 @@ module.exports = {
         // --- HÀNH ĐỘNG NGÀY (DAY VOTE BUTTON) ---
         if (action === 'day') {
             // parts: [ 'masoi', 'day', 'vote', '<targetId>' ] 
-            const targetId = parts[3]; // <--- SỬA INDEX TỪ 2 THÀNH 3 VÌ CUSTOM ID LÀ masoi_day_vote_<targetId>
             const voterId = interaction.user.id;
-            
-            if (!game || game.status !== 'day') return interaction.followUp({ content: '❌ Hiện đang không phải thời gian bỏ phiếu.', ephemeral: true });
-            
-            // processDayVote đã bao gồm tất cả các bước: kiểm tra, lưu phiếu, update embed, kiểm tra lynch.
+            // Two possible vote inputs:
+            // 1) button per target: customId = masoi_day_vote_<targetId>
+            // 2) select menu: customId = masoi_day_vote_select with interaction.values[0] = targetId
+            let targetId = parts[3];
+
+            // if select menu id
+            if (customId === 'masoi_day_vote_select') {
+                targetId = interaction.values && interaction.values[0];
+            }
+
+            if (!game || game.status !== 'day') return interaction.reply({ content: '❌ Hiện đang không phải thời gian bỏ phiếu.', ephemeral: true }).catch(()=>{});
+
+            if (!targetId) return interaction.reply({ content: '❌ Bạn chưa chọn mục tiêu.', ephemeral: true }).catch(()=>{});
+
+            // Delegate to processDayVote (it will reply ephemeral)
             await processDayVote(game, voterId, targetId, client, interaction);
             return;
         }
