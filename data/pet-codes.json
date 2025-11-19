@@ -3,10 +3,27 @@
     "reward": {
       "rareCandy": 10,
       "randomPet": {
-        "exclude": ["legendary", "mythic"]
+        "exclude": ["Legendary", "Mythic"]
       },
       "randomBalls": 5,
-      "randomSkillScrolls": 3
+      "randomSkillScrolls": 3,
+      "coins": 1000,
+      "xp": 500
+    },
+    "usedBy": []
+  },
+  "STARTER": {
+    "reward": {
+      "randomPet": {},
+      "coins": 500
+    },
+    "usedBy": []
+  },
+  "RARE2025": {
+    "reward": {
+      "rareCandy": 5,
+      "randomPet": {"exclude": ["Mythic"]},
+      "coins": 2000
     },
     "usedBy": []
   }

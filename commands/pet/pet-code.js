@@ -7,7 +7,7 @@ const codesFile = path.resolve(__dirname, "../../data/pet-codes.json");
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("pet")
+    .setName("pet-code")
     .setDescription("Hệ thống thú nuôi")
     .addSubcommand(sub =>
       sub

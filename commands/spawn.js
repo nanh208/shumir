@@ -34,7 +34,13 @@ module.exports = {
     .addSubcommand(sub => sub.setName('kill').setDescription('Giết pet để nhận kẹo').addStringOption(opt => opt.setName('id').setDescription('ID pet').setRequired(true))),
 
   async execute(interaction) {
-    const sub = interaction.options.getSubcommand();
+    let sub;
+    try {
+      sub = interaction.options.getSubcommand();
+    } catch (e) {
+      return interaction.reply({ content: '❗ Vui lòng chọn một hành động: `register`, `unregister`, `now`, `kill`.', ephemeral: true });
+    }
+
     // permission guard for admin-only subcommands
     const adminOnly = ['register', 'unregister', 'now'];
     if (adminOnly.includes(sub)) {

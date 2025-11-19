@@ -2,9 +2,10 @@
 const { readJSON, writeJSON } = require("./utils");
 const petsFile = "./data/pets.json";
 
-function levelUpPet(userId, petId, statPoints) {
+function levelUpPet(userId, petIdRaw, statPoints) {
+    const petId = Number(petIdRaw);
     const data = readJSON(petsFile);
-    const pet = data.users[userId]?.pets.find(p => p.id === petId);
+    const pet = data.users[userId]?.pets.find(p => Number(p.id) === petId);
     if(!pet) return false;
     const maxLevel = 100;
     if(pet.level >= maxLevel) return false;

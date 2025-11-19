@@ -8,9 +8,10 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName("upgrade")
         .setDescription("Nâng cấp pet của bạn")
-        .addIntegerOption(option => option.setName("id").setDescription("ID pet muốn nâng cấp").setRequired(true)),
+        .addStringOption(option => option.setName("id").setDescription("ID pet muốn nâng cấp").setRequired(true)),
     async execute(interaction) {
-        const petId = interaction.options.getInteger("id");
+        const petIdRaw = interaction.options.getString("id");
+        const petId = Number(petIdRaw);
         const statPoints = { hp:10, mana:5, attack:5, speed:2, armor:1 }; // ví dụ
         const success = levelUpPet(interaction.user.id, petId, statPoints);
         await interaction.reply(success ? `🔺 Pet đã được nâng cấp!` : `⚠️ Pet đã đạt cấp tối đa hoặc không tồn tại!`);

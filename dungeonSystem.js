@@ -20,10 +20,17 @@ function generateBoss(level, difficulty="Easy") {
 }
 
 function calculateVictory(userPet, boss) {
+    if (!userPet || !userPet.stats) {
+        // no pet provided -> low chance
+        return Math.random() > 0.85;
+    }
     const petTotal = Object.values(userPet.stats).reduce((a,b)=>a+b,0);
     const bossTotal = Object.values(boss.stats).reduce((a,b)=>a+b,0);
     if (bossTotal > petTotal * 1.5) return false;
-    return Math.random() > 0.4 ? true : false;
+    // scale chance by relative power
+    const ratio = petTotal / bossTotal;
+    const base = Math.min(0.9, Math.max(0.1, 0.5 * ratio));
+    return Math.random() < base;
 }
 
 function rewardPlayer(userId, difficulty="Easy") {
