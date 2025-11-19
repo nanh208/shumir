@@ -1,0 +1,11 @@
+{
+    "users": {
+        "USER_ID_1": {
+            "pets": [],
+            "inventory": [],
+            "xp": 0,
+            "coins": 0
+        }
+    },
+    "wildPets": []
+}

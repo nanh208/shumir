@@ -4,6 +4,8 @@ const path = require("path");
 const { PermissionFlagsBits } = require("discord.js");
 
 const configPath = path.resolve(__dirname, "../data/game-config.json");
+const { spawnWildPets } = require("../spawnWildPet");
+const petsPath = path.resolve(__dirname, "../data/pets.json");
 
 module.exports = {
   name: "ready",
@@ -61,6 +63,23 @@ module.exports = {
       console.log(`🔁 Đã khôi phục game trong kênh #${channel.name}`);
     } catch (err) {
       console.error("❌ Lỗi khi khôi phục game:", err);
+    }
+
+    // --- Pet spawn scheduler: read registered spawn channels and schedule spawn every 10 minutes ---
+    try {
+      const petsData = fs.existsSync(petsPath) ? JSON.parse(fs.readFileSync(petsPath, 'utf8')) : { spawnChannels: {} };
+      const spawnChannels = petsData.spawnChannels || {};
+      for (const [guildId, channelId] of Object.entries(spawnChannels)) {
+        // spawn immediately once
+        spawnWildPets(client, channelId, 10).catch(()=>{});
+        // schedule every 10 minutes (600000 ms)
+        setInterval(() => {
+          spawnWildPets(client, channelId, 10).catch(()=>{});
+        }, 10 * 60 * 1000);
+        console.log(`🔁 Đã lên lịch spawn pet mỗi 10 phút cho kênh ${channelId} (server ${guildId})`);
+      }
+    } catch (e) {
+      console.error('Lỗi khi đọc cấu hình spawn pet:', e);
     }
   },
 };

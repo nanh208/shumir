@@ -1,0 +1,13 @@
+{
+  "PETV2": {
+    "reward": {
+      "rareCandy": 10,
+      "randomPet": {
+        "exclude": ["legendary", "mythic"]
+      },
+      "randomBalls": 5,
+      "randomSkillScrolls": 3
+    },
+    "usedBy": []
+  }
+}

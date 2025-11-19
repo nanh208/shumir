@@ -48,26 +48,7 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName("masoi")
         .setDescription("Bắt đầu, tham gia và quản lý trò chơi Ma Sói.")
-        // Root options: allow `/masoi <mode> <players>` as shorthand
-        .addStringOption(opt =>
-            opt.setName('mode')
-               .setDescription('Chế độ chơi (classic, quick, turbo, chaos, custom).')
-               .setRequired(false)
-               .addChoices(
-                    { name: 'Classic (Cổ điển)', value: 'classic' },
-                    { name: 'Quick (Nhanh)', value: 'quick' },
-                    { name: 'Turbo (Siêu nhanh)', value: 'turbo' },
-                    { name: 'Chaos (Hỗn loạn)', value: 'chaos' },
-                    { name: 'Custom (Tùy chỉnh)', value: 'custom' },
-               )
-        )
-        .addIntegerOption(opt =>
-            opt.setName('players')
-               .setDescription('Tổng số người chơi (8-16). Nếu không có, dùng giá trị mặc định của chế độ.')
-               .setRequired(false)
-               .setMinValue(5)
-               .setMaxValue(20)
-        )
+        // Note: options for creating a game live under the `create` subcommand.
         .addSubcommand(subcommand =>
             subcommand
                 .setName("create")
