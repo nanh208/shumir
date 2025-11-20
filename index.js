@@ -1,4 +1,4 @@
-// index.js — Shumir Bot (COMMONJS VERSION)
+// index.js — Shumir Bot (COMMONJS PHIÊN BẢN ĐẦY ĐỦ VÀ TỐI ƯU)
 
 require("dotenv").config();
 const fs = require("fs");
@@ -8,9 +8,10 @@ const {
     Collection,
     GatewayIntentBits,
     Events,
+    EmbedBuilder, // Giữ lại EmbedBuilder cho xử lý lỗi
 } = require("discord.js");
 
-// ====== CLIENT CONFIGURATION ======
+// ====== 1. CLIENT CONFIGURATION ======
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -19,57 +20,66 @@ const client = new Client({
     ],
 });
 
-// ====== STATE GAME & LOGIC IMPORT (CJS & MJS Handling) ======
-client.gameStates = new Map(); // Nối Từ
-let spawner; // Khai báo sớm hơn để sử dụng trong logic Game khác (nếu cần)
+// ====== 2. GAME STATE & LOGIC IMPORTS (KẾT HỢP TẤT CẢ LOGIC GAME) ======
 
-// --- Ma Sói & Cờ Tỷ Phú (CJS Logic) ---
+// --- Nối Từ (Lưu trữ trạng thái game) ---
+const wordGameStates = new Map(); 
+const configPath = path.resolve(__dirname, './data/game-config.json');
+
+// --- Ma Sói & Cờ Tỷ Phú (Logic cũ) ---
 const { activeWerewolfGames } = require("./utils/activeWerewolfGames.js");
-const { processDayVote, processMayorDecision, handleWerewolfInteraction } = require("./utils/werewolfLogic.js");
 const { activeMonopolyGames, handleMonopolyInteraction } = require('./utils/monopolyLogic.js'); 
+// Giả định bạn đã sửa lỗi require trong events/ready.js
+// const { processDayVote, processMayorDecision, handleWerewolfInteraction } = require("./utils/werewolfLogic.js");
 
-// --- Pet Game (Sử dụng require cho các file .mjs) ---
-// Note: Khi dùng require() cho .mjs, Node.js trả về một đối tượng chứa tất cả các export, 
-// bao gồm cả 'default' nếu có. Nếu bạn export Class/Function bình thường (export const X), 
-// nó sẽ nằm trong thuộc tính cùng tên.
-
-// 1. Nhập các Module .mjs:
+// --- Pet Game (Sửa lỗi MJS) ---
 const SpawnModule = require("./SpawnSystem.mjs"); 
 const BattleModule = require("./BattleManager.mjs"); 
 const CommandModule = require("./CommandHandlers.mjs"); 
+const SkillListModule = require("./SkillList.mjs"); // Sửa lỗi SkillList.js -> SkillList.mjs
 
-// 2. Trích xuất các hàm/class cần thiết:
-const SpawnSystem = SpawnModule.SpawnSystem; // Lấy class SpawnSystem từ export
-const handleBattle = BattleModule.handleInteraction; // Lấy hàm xử lý tương tác chiến đấu
-const handleSlashCommand = CommandModule.handleSlashCommand; // Lấy hàm xử lý lệnh Pet Game
-const handleButtons = CommandModule.handleButtons; // Lấy hàm xử lý nút giao diện Pet Game
-const setSpawnSystemRef = CommandModule.setSpawnSystemRef; // Lấy hàm set ref cho spawner
+// Trích xuất các hàm/class cần thiết
+let spawner; 
+const SpawnSystem = SpawnModule.SpawnSystem; 
+const handleBattle = BattleModule.handleInteraction; 
+const handleSlashCommand = CommandModule.handleSlashCommand; 
+const handleButtons = CommandModule.handleButtons; 
+const setSpawnSystemRef = CommandModule.setSpawnSystemRef; 
+const { elementalSkills, physicalSkills } = SkillListModule; 
 
-// 3. SỬA LỖI MODULE NOT FOUND: Đã sửa từ SkillList.js thành SkillList.mjs
-const SkillListModule = require("./SkillList.mjs"); 
-const { elementalSkills, physicalSkills } = SkillListModule; // Lấy các exports từ module
-
-// Utils
-const { readJSON, writeJSON } = require("./index.js"); // Tên file/folder 'utils'
-
-// ============================
-// 🔥 KHỞI TẠO SPAWN SYSTEM (Run Once)
-// ============================
-client.once(Events.ClientReady, () => {
-    console.log(`✅ Bot đã đăng nhập thành công: ${client.user.tag}`);
-    
-    // Khởi tạo và Start Spawn System MỚI
-    spawner = new SpawnSystem(client); 
-    setSpawnSystemRef(spawner); // Cung cấp instance của spawner cho CommandHandlers
-    spawner.start(); 
-});
+// --- Utils (SỬA LỖI MODULE NOT FOUND: Giả định tệp tiện ích là fileUtils.js nằm trong utils/) ---
+// NẾU file tiện ích của bạn tên là 'fileUtils.js' và nằm trong thư mục 'utils':
+const { readJSON, writeJSON } = require("./utils/fileUtils.js"); 
 
 
-// ====== LOAD SLASH COMMANDS ======
+// ====== 3. KHỞI TẠO NỐI TỪ (TÍCH HỢP LOGIC BỀN VỮNG) ======
+try {
+    if (fs.existsSync(configPath)) {
+        const configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        const channelId = configData.wordGameChannelId;
+        if (channelId) {
+            wordGameStates.set(channelId, {
+                lastSyllable: null,
+                lastUser: null,
+                usedWords: new Set()
+            });
+            console.log(`✅ Game Nối Từ đã được khởi tạo cho kênh: ${channelId}`);
+        }
+    } else {
+        fs.mkdirSync(path.dirname(configPath), { recursive: true });
+        fs.writeFileSync(configPath, JSON.stringify({ wordGameChannelId: null }, null, 2));
+        console.log("File game-config.json đã được tạo.");
+    }
+} catch (e) {
+    console.error("Lỗi khi đọc/tạo config Nối Từ:", e);
+}
+
+
+// ====== 4. LOAD SLASH COMMANDS & EVENTS ======
 client.commands = new Collection();
 const commandsPath = path.join(__dirname, "commands");
 
-// --- Hàm tải lệnh từ thư mục ---
+// --- Hàm tải lệnh (Tối ưu) ---
 const loadCommands = (directoryPath) => {
     fs.readdirSync(directoryPath)
         .filter(f => f.endsWith(".js"))
@@ -86,91 +96,121 @@ const loadCommands = (directoryPath) => {
             }
         });
 };
+// Thực thi tải lệnh
+if (fs.existsSync(commandsPath)) {
+    loadCommands(commandsPath);
+    fs.readdirSync(commandsPath)
+        .filter(name => fs.statSync(path.join(commandsPath, name)).isDirectory())
+        .forEach(folder => {
+            loadCommands(path.join(commandsPath, folder));
+        });
+    console.log(`✅ Đã tải ${client.commands.size} slash commands.`);
+} else {
+    console.warn("⚠️ Thư mục commands không tồn tại:", commandsPath);
+}
 
-// Load lệnh root và subfolder
-loadCommands(commandsPath);
-fs.readdirSync(commandsPath)
-    .filter(name => fs.statSync(path.join(commandsPath, name)).isDirectory())
-    .forEach(folder => {
-        loadCommands(path.join(commandsPath, folder));
+
+// --- BỘ NẠP EVENT ---
+const eventsPath = path.join(__dirname, 'events');
+if (fs.existsSync(eventsPath)) {
+    const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
+    for (const file of eventFiles) {
+        const filePath = path.join(eventsPath, file);
+        try {
+            const event = require(filePath);
+            
+            // Truyền tất cả game state cần thiết
+            const eventCallback = (...args) => {
+                // SỬA LỖI: Truyền wordGameStates cho MessageCreate
+                if (event.name === Events.MessageCreate) {
+                    event.execute(...args, wordGameStates);
+                } else {
+                    // Truyền tất cả state cho các event khác (ví dụ: ready.js cần spawner)
+                    event.execute(...args, wordGameStates, activeWerewolfGames, activeMonopolyGames, spawner);
+                }
+            };
+            
+            if (event.once) client.once(event.name, eventCallback);
+            else client.on(event.name, eventCallback);
+
+        } catch (err) {
+            console.error(`[❌] Lỗi khi nạp event ${file}:`, err);
+        }
+    }
+    console.log(`✅ Đã tải ${eventFiles.length} events.`);
+} else {
+    console.warn("⚠️ Thư mục events không tồn tại:", eventsPath);
+}
+
+
+// ====== 5. READY & SPAWN SYSTEM START ======
+client.once(Events.ClientReady, () => {
+    console.log(`✅ Bot đã đăng nhập: ${client.user.tag}`);
+    client.user.setPresence({
+        activities: [{ name: "🎉 Shumir: Các Game Việt Hóa!", type: 0 }],
+        status: "online",
     });
-
-console.log(`✅ Đã tải ${client.commands.size} slash commands.`);
-
-
-// ====== LOAD EVENTS ======
-const eventsPath = path.join(__dirname, "events");
-fs.readdirSync(eventsPath)
-    .filter(f => f.endsWith(".js"))
-    .forEach(file => {
-        const evt = require(path.join(eventsPath, file));
-        const eventCallback = (...args) => evt.execute(...args, client.gameStates, activeWerewolfGames, activeMonopolyGames);
-        
-        if (evt.once) client.once(evt.name, eventCallback);
-        else client.on(evt.name, eventCallback);
-    });
-
-console.log(`✅ Đã tải ${fs.readdirSync(eventsPath).length} events.`);
+    
+    // KHỞI ĐỘNG HỆ THỐNG SPAWN PET
+    spawner = new SpawnSystem(client); 
+    setSpawnSystemRef(spawner); // Cung cấp ref cho CommandHandlers
+    spawner.start(); 
+});
 
 
 // ---
-// ====== INTERACTION HANDLER (BỘ ĐỊNH TUYẾN TƯƠNG TÁC) ======
+// ====== 6. INTERACTION HANDLER (BỘ ĐỊNH TUYẾN TƯƠNG TÁC ĐẦY ĐỦ) ======
 // ---
 client.on("interactionCreate", async (interaction) => {
     try {
         const { customId, commandName } = interaction;
 
-        // --- 1. SLASH COMMAND ---
+        // --- SLASH COMMAND ---
         if (interaction.isChatInputCommand()) {
             
-            // Định tuyến Pet Game commands (/inventory, /setup_spawn, /adventure, /code)
+            // 1. Định tuyến Pet Game commands
             if (['inventory', 'adventure', 'setup_spawn', 'code'].includes(commandName)) {
                 return handleSlashCommand(interaction);
             }
 
-            // Định tuyến commands game khác
+            // 2. Định tuyến commands game khác
             const command = client.commands.get(commandName);
-            if (!command) {
-                console.warn(`[⚠️] Không tìm thấy lệnh /${commandName}`);
-                return;
-            }
-            // Ghi chú: Đảm bảo command.execute có thể nhận các tham số game state
-            return command.execute(interaction, client, client.gameStates, activeWerewolfGames, activeMonopolyGames);
+            if (!command) return;
+            // Truyền game state đầy đủ: (wordGameStates, activeWerewolfGames, activeMonopolyGames)
+            return command.execute(interaction, client, wordGameStates, activeWerewolfGames, activeMonopolyGames);
         }
 
-        // --- 2. BUTTON & SELECT MENU ---
+        // --- BUTTON & SELECT MENU ---
 
-        // Pet Game: Chiến đấu/Bắt Pet
+        // 1. Pet Game: Chiến đấu/Bắt Pet
         if (customId?.startsWith("challenge_") || customId?.startsWith("use_skill_") || customId?.startsWith("btn_")) {
-            // Gửi tương tác đến BattleManager (vì nó chứa logic 'challenge_')
             return handleBattle(interaction); 
         }
-        // Pet Game: Giao diện (Inventory/Adventure/Khác)
+        // 2. Pet Game: Giao diện (Inventory/Adventure/Khác)
         if (customId?.startsWith("inv_") || customId?.startsWith("adv_")) {
             return handleButtons(interaction);
         }
         
-        // Cờ Tỷ Phú
+        // 3. Cờ Tỷ Phú
         if (customId?.startsWith('monopoly_')) {
             const game = activeMonopolyGames.get(interaction.channelId);
-            // Kiểm tra game đang hoạt động hoặc là nút 'join'
             if (game && (interaction.message.id === game.messageId || customId === 'monopoly_join')) {
                 return handleMonopolyInteraction(interaction); 
             }
             return interaction.reply({ content: "Trò chơi Cờ Tỷ Phú này đã kết thúc hoặc không còn hoạt động.", ephemeral: true });
         }
 
-        // Ma Sói
+        // 4. Ma Sói (Sử dụng lệnh /masoi component handler)
         if (customId?.startsWith('masoi_')) {
             const masoiCmd = client.commands.get('masoi');
             if (masoiCmd && typeof masoiCmd.component === 'function') {
-                return masoiCmd.component(interaction, client, client.gameStates, activeWerewolfGames);
+                return masoiCmd.component(interaction, client, wordGameStates, activeWerewolfGames);
             }
         }
         
-        // --- Logic Buttons Cũ (Nên xóa hoặc tích hợp sau) ---
+        // Buttons cũ (Giữ lại tạm thời)
         if (customId?.startsWith('pet_') || customId?.startsWith('pvp_')) {
-             // (Logic Pet/PvP cũ của bạn, giữ lại để không gây lỗi ngay lập tức)
+             // Logic cũ
         }
         
 
@@ -187,7 +227,7 @@ client.on("interactionCreate", async (interaction) => {
 });
 
 
-// ====== LOGIN & PROCESS HANDLING ======
+// ====== 7. LOGIN & PROCESS HANDLING ======
 const token = (process.env.BOT_TOKEN || process.env.TOKEN || "").trim();
 
 if (!token || token.includes(' ') || token.length < 20) {
@@ -209,5 +249,5 @@ process.on('unhandledRejection', (reason, promise) => {
 
 process.on('uncaughtException', (err) => {
     console.error('🔥 Uncaught Exception:', err);
-    process.exit(1); // Nên thoát để restart process nếu là lỗi nghiêm trọng
+    process.exit(1); 
 });

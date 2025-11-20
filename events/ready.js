@@ -1,85 +1,80 @@
-const { activeGames } = require("../data/activeGames.js");
+const { Events, ActivityType } = require('discord.js');
 const fs = require("fs");
 const path = require("path");
-const { PermissionFlagsBits } = require("discord.js");
+
+// Logic Nối Từ cũ (Giữ lại nếu bạn vẫn dùng)
+// Đảm bảo đường dẫn ../data/activeGames.js là chính xác
+let activeGames = {};
+try {
+    const gameData = require("../data/activeGames.js");
+    activeGames = gameData.activeGames || gameData;
+} catch (e) {
+    console.warn("⚠️ Không tìm thấy data/activeGames.js, bỏ qua khôi phục Nối Từ.");
+}
 
 const configPath = path.resolve(__dirname, "../data/game-config.json");
-const { spawnWildPets } = require("../spawnWildPet");
-const petsPath = path.resolve(__dirname, "../data/pets.json");
 
 module.exports = {
-  name: "ready",
-  once: true,
-  async execute(client) {
-    console.log(`✅ Bot đã sẵn sàng: ${client.user.tag}`);
+    name: Events.ClientReady,
+    once: true,
+    async execute(client) {
+        console.log(`✅ Bot đã sẵn sàng! Đăng nhập dưới tên: ${client.user.tag}`);
 
-    // Đặt presence giống như trước (hợp nhất vào đây để tránh duplicate)
-    try {
-      client.user.setPresence({
-        activities: [{ name: "🎉 Ma Sói & Nối Từ!", type: 0 }],
-        status: "online",
-      });
-    } catch (e) {
-      console.warn('Không thể set presence:', e?.message || e);
-    }
+        // 1. Đặt trạng thái Bot
+        try {
+            client.user.setPresence({
+                activities: [{ name: "🎉 Ma Sói, Nối Từ & Pet!", type: ActivityType.Playing }],
+                status: "online",
+            });
+        } catch (e) {
+            console.warn('Không thể set presence:', e?.message || e);
+        }
 
-    // Đọc cấu hình để biết kênh chơi Nối Từ
-    if (!fs.existsSync(configPath)) return;
-    const configData = JSON.parse(fs.readFileSync(configPath, "utf8"));
-    const channelId = configData.wordGameChannelId;
-    if (!channelId) return;
+        // 2. Logic Khôi phục Game Nối Từ (Giữ nguyên từ code cũ của bạn)
+        if (fs.existsSync(configPath)) {
+            try {
+                const configData = JSON.parse(fs.readFileSync(configPath, "utf8"));
+                const channelId = configData.wordGameChannelId;
 
-    // Nếu có game đang lưu và kênh hợp lệ
-    const savedGame = activeGames[channelId];
-    if (!savedGame || !savedGame.started) return;
+                if (channelId) {
+                    const savedGame = activeGames ? activeGames[channelId] : null;
+                    
+                    // Chỉ khôi phục nếu có dữ liệu game đang chạy
+                    if (savedGame && savedGame.started) {
+                        const channel = await client.channels.fetch(channelId).catch(() => null);
+                        if (channel) {
+                            // Mở lại quyền chat nếu cần (tùy chọn)
+                            /*
+                            await channel.permissionOverwrites.edit(channel.guild.roles.everyone, {
+                                SendMessages: true,
+                            }).catch(() => {});
+                            */
 
-    try {
-      const channel = await client.channels.fetch(channelId);
-      if (!channel) return console.warn("⚠️ Không tìm thấy kênh đã lưu trong config.");
+                            // Gửi thông báo khôi phục
+                            await channel.send({
+                                content: `🌀 **Bot đã khởi động lại!** Tiếp tục Nối Từ.\nTừ cuối: **${savedGame.lastWord}**`,
+                            }).catch(() => {});
 
-      // 🧩 Gỡ hạn chế gửi tin nhắn cho mọi người (nếu trước đó bị tắt)
-      await channel.permissionOverwrites.edit(channel.guild.roles.everyone, {
-        SendMessages: true,
-      });
-      console.log(`🔓 Đã mở lại quyền gửi tin nhắn trong kênh #${channel.name}`);
+                            // Đồng bộ lại state vào RAM
+                            if (!client.gameStates) client.gameStates = new Map();
+                            client.gameStates.set(channelId, {
+                                lastWord: savedGame.lastWord,
+                                lastUser: savedGame.lastPlayer,
+                                usedWords: new Set(savedGame.usedWords || []),
+                            });
+                            
+                            console.log(`🔁 Đã khôi phục Nối Từ tại kênh #${channel.name}`);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("❌ Lỗi khi khôi phục Nối Từ:", err);
+            }
+        }
 
-      // Gửi thông báo khôi phục game
-      await channel.send({
-        content:
-          `🌀 **Bot đã khởi động lại và tiếp tục trò chơi Nối Từ!**\n` +
-          `Từ cuối cùng là: **${savedGame.lastWord}**\n` +
-          `👉 Nối tiếp bằng từ bắt đầu với: **${savedGame.lastWord.split(" ").pop()}**`,
-      });
-
-      // Đồng bộ lại với `client.gameStates` trong RAM (để tiếp tục nối)
-      const gameStates = client.gameStates || new Map();
-      gameStates.set(channelId, {
-        lastWord: savedGame.lastWord,
-        lastUser: savedGame.lastPlayer,
-        usedWords: new Set(savedGame.usedWords || []),
-      });
-      client.gameStates = gameStates;
-
-      console.log(`🔁 Đã khôi phục game trong kênh #${channel.name}`);
-    } catch (err) {
-      console.error("❌ Lỗi khi khôi phục game:", err);
-    }
-
-    // --- Pet spawn scheduler: read registered spawn channels and schedule spawn every 10 minutes ---
-    try {
-      const petsData = fs.existsSync(petsPath) ? JSON.parse(fs.readFileSync(petsPath, 'utf8')) : { spawnChannels: {} };
-      const spawnChannels = petsData.spawnChannels || {};
-      for (const [guildId, channelId] of Object.entries(spawnChannels)) {
-        // spawn immediately once
-        spawnWildPets(client, channelId, 10).catch(()=>{});
-        // schedule every 10 minutes (600000 ms)
-        setInterval(() => {
-          spawnWildPets(client, channelId, 10).catch(()=>{});
-        }, 10 * 60 * 1000);
-        console.log(`🔁 Đã lên lịch spawn pet mỗi 10 phút cho kênh ${channelId} (server ${guildId})`);
-      }
-    } catch (e) {
-      console.error('Lỗi khi đọc cấu hình spawn pet:', e);
-    }
-  },
+        // --- LƯU Ý QUAN TRỌNG ---
+        // Logic Spawn Pet đã được chuyển sang 'SpawnSystem.mjs' và được gọi trong 'index.js'.
+        // Không cần (và không được) gọi lại ở đây để tránh lỗi và trùng lặp.
+        console.log("🚀 Hệ thống Pet Game (SpawnSystem) đang được quản lý bởi index.js");
+    },
 };
