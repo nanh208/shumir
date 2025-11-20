@@ -3,14 +3,19 @@
     "reward": {
       "rareCandy": 10,
       "randomPet": {
-        "exclude": ["Legendary", "Mythic"]
+        "exclude": [
+          "Legendary",
+          "Mythic"
+        ]
       },
       "randomBalls": 5,
       "randomSkillScrolls": 3,
       "coins": 1000,
       "xp": 500
     },
-    "usedBy": []
+    "usedBy": [
+      "1162815019264786513"
+    ]
   },
   "STARTER": {
     "reward": {
@@ -22,9 +27,42 @@
   "RARE2025": {
     "reward": {
       "rareCandy": 5,
-      "randomPet": {"exclude": ["Mythic"]},
+      "randomPet": {
+        "exclude": [
+          "Mythic"
+        ]
+      },
       "coins": 2000
     },
     "usedBy": []
+  },
+  "TANTHU": {
+    "reward": {
+      "candies": {
+        "normal": 10,
+        "high": 2
+      },
+      "randomPet": {
+        "isVip": false,
+        "name": "Pet Khởi Đầu"
+      }
+    },
+    "limit": 99999
+  },
+  "VIPCODE2024": {
+    "reward": {
+      "candies": {
+        "super": 1
+      },
+      "randomPet": {
+        "isVip": true,
+        "name": "Rồng Thần"
+      },
+      "crates": {
+          "mythic": 1
+      }
+    },
+    "limit": 50,
+    "expires": 1735689600000
   }
 }

@@ -1,1 +1,48 @@
-{}
+{
+  "1162815019264786513": {
+    "pets": [
+      {
+        "id": "mi7l0zw8gg2z4062st8",
+        "name": "Spirit",
+        "icon": "<:kiuri:1440702420094156851>",
+        "element": "Water",
+        "race": "Elf",
+        "rarity": "Uncommon",
+        "baseStats": {
+          "HP": 900,
+          "MP": 800,
+          "ATK": 1000,
+          "DEF": 950,
+          "SPD": 110,
+          "SATK": 1300
+        },
+        "level": 1,
+        "xp": 0,
+        "gen": 36,
+        "currentHP": 1019,
+        "currentMP": 256,
+        "skills": [
+          "S1",
+          "ear_heal_2",
+          "phy_06",
+          "gra_slow_1"
+        ],
+        "activeEffects": []
+      }
+    ],
+    "inventory": {
+      "candies": {
+        "normal": 4,
+        "high": 0,
+        "super": 0
+      },
+      "crates": {
+        "common": 0,
+        "mythic": 0
+      },
+      "skillBooks": []
+    },
+    "codesRedeemed": [],
+    "hasClaimedStarter": true
+  }
+}
