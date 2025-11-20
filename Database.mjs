@@ -1,0 +1,89 @@
+// Database.mjs
+import fs from 'fs';
+import path from 'path';
+
+const DATA_DIR = './data';
+const USER_FILE = path.join(DATA_DIR, 'users.json');
+const CONFIG_FILE = path.join(DATA_DIR, 'config.json'); // File cấu hình riêng
+
+// Cấu trúc dữ liệu mặc định cho người chơi mới
+const DEFAULT_USER_DATA = {
+    pets: [],
+    inventory: {
+        candies: { normal: 0, high: 0, super: 0 },
+        crates: { common: 0, mythic: 0 },
+        skillBooks: []
+    },
+    codesRedeemed: []
+};
+
+// Đảm bảo thư mục và file tồn tại khi khởi động
+if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR);
+}
+if (!fs.existsSync(USER_FILE)) {
+    fs.writeFileSync(USER_FILE, JSON.stringify({}, null, 2));
+}
+if (!fs.existsSync(CONFIG_FILE)) {
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify({ spawnChannelId: null }, null, 2));
+}
+
+export class Database {
+    static getAllUserData() {
+        try {
+            const data = fs.readFileSync(USER_FILE, 'utf8');
+            return JSON.parse(data);
+        } catch (err) {
+            console.error("Lỗi đọc user data:", err);
+            return {};
+        }
+    }
+
+    static saveAllUserData(data) {
+        try {
+            fs.writeFileSync(USER_FILE, JSON.stringify(data, null, 2));
+        } catch (err) {
+            console.error("Lỗi lưu user data:", err);
+        }
+    }
+
+    static getUser(userId) {
+        const allData = this.getAllUserData();
+        
+        if (!allData[userId]) {
+            allData[userId] = JSON.parse(JSON.stringify(DEFAULT_USER_DATA));
+            this.saveAllUserData(allData);
+        }
+        
+        return allData[userId];
+    }
+
+    static updateUser(userId, newData) {
+        const allData = this.getAllUserData();
+        allData[userId] = newData;
+        this.saveAllUserData(allData);
+    }
+
+    static addPetToUser(userId, petData) {
+        const user = this.getUser(userId);
+        // Sử dụng hàm getDataForSave() từ Pet.mjs
+        user.pets.push(petData.getDataForSave ? petData.getDataForSave() : petData);
+        this.updateUser(userId, user);
+    }
+
+    // CONFIG FUNCTIONS (MỚI)
+    static getConfig() {
+        try { 
+            return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')); 
+        } 
+        catch (e) { 
+            return { spawnChannelId: null }; 
+        }
+    }
+
+    static setSpawnChannel(channelId) {
+        const config = this.getConfig();
+        config.spawnChannelId = channelId;
+        fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+    }
+}
