@@ -3,11 +3,15 @@
     "pets": [
       {
         "id": "mi7l0zw8gg2z4062st8",
+        "ownerId": null,
         "name": "Spirit",
         "icon": "<:kiuri:1440702420094156851>",
-        "element": "Water",
-        "race": "Elf",
         "rarity": "Uncommon",
+        "race": "Elf",
+        "element": "Water",
+        "level": 1,
+        "currentExp": 50,
+        "statPoints": 0,
         "baseStats": {
           "HP": 900,
           "MP": 800,
@@ -16,11 +20,16 @@
           "SPD": 110,
           "SATK": 1300
         },
-        "level": 1,
-        "xp": 0,
-        "gen": 36,
-        "currentHP": 1019,
-        "currentMP": 256,
+        "statBonus": {
+          "hp": 0,
+          "mp": 0,
+          "atk": 0,
+          "satk": 0,
+          "def": 0,
+          "spd": 0
+        },
+        "currentHP": 2035,
+        "currentMP": 116,
         "skills": [
           "S1",
           "ear_heal_2",
@@ -32,7 +41,7 @@
     ],
     "inventory": {
       "candies": {
-        "normal": 4,
+        "normal": 0,
         "high": 0,
         "super": 0
       },
@@ -44,5 +53,61 @@
     },
     "codesRedeemed": [],
     "hasClaimedStarter": true
+  },
+  "1185865935874162830": {
+    "pets": [
+      {
+        "id": "b9b97a1b-c89d-445c-9318-eb17e9849877",
+        "ownerId": "1185865935874162830",
+        "name": "Wisp",
+        "icon": "<a:baf5c89c099b34decb7f4507b5144366:1440702202762231828>",
+        "rarity": "Uncommon",
+        "race": "ELEMENTAL",
+        "element": "Physical",
+        "level": 1,
+        "currentExp": 0,
+        "statPoints": 0,
+        "baseStats": {
+          "HP_Base": 800,
+          "MP_Base": 700,
+          "ATK_Base": 120,
+          "SATK_Base": 130,
+          "DEF_Base": 85,
+          "SPD_Base": 130
+        },
+        "statBonus": {
+          "hp": 0,
+          "mp": 0,
+          "atk": 0,
+          "satk": 0,
+          "def": 0,
+          "spd": 0
+        },
+        "currentHP": 1587,
+        "currentMP": 1507,
+        "skills": [
+          "S1",
+          "wat_def_1",
+          "wat_heal_1",
+          "ear_blast_1"
+        ],
+        "activeEffects": []
+      }
+    ],
+    "inventory": {
+      "candies": {
+        "normal": 5,
+        "high": 0,
+        "super": 0
+      },
+      "crates": {
+        "common": 0,
+        "mythic": 0
+      },
+      "skillBooks": []
+    },
+    "codesRedeemed": [],
+    "hasClaimedStarter": true,
+    "createdAt": 1763686934664
   }
 }

@@ -21,7 +21,7 @@ const commands = [];
 const commandNames = new Set(); // Dùng để kiểm tra trùng lặp tên lệnh
 
 // =====================================================
-// 1. ĐỊNH NGHĨA THỦ CÔNG CÁC LỆNH PET GAME (HỆ THỐNG MỚI)
+// 1. ĐỊNH NGHĨA THỦ CÔNG CÁC LỆNH PET GAME (ưHỆ THỐNG MỚI)
 // =====================================================
 const petCommands = [
     // LỆNH MỚI: /pet (Subcommands: random, info, list)
