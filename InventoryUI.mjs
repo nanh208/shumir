@@ -39,12 +39,10 @@ function createProgressBar(current, max, totalChars = 10) {
 // ==========================================
 
 export async function showInventory(interaction, page = 0) {
-    // Lấy thông tin người dùng và dữ liệu
     const userId = interaction.user.id;
     const userData = Database.getUser(userId);
     page = parseInt(page) || 0;
     
-    // Đảm bảo có activePetIndex
     if (userData.activePetIndex === undefined) userData.activePetIndex = 0;
 
     if (!userData.inventory) userData.inventory = { candies: {}, skillbooks: {}, crates: {} };
@@ -84,7 +82,6 @@ export async function showInventory(interaction, page = 0) {
             const rIcon = RARITY_CONFIG[p.rarity]?.icon || '⚪';
             const eIcon = ELEMENT_ICONS[p.element] || '';
             
-            // HIỂN THỊ TRẠNG THÁI ĐỒNG HÀNH
             const isActive = (userData.activePetIndex === absoluteIndex);
             const statusIcon = isActive ? '🚩 **[Đang chọn]**' : (p.deathTime ? '💀' : '');
             
@@ -129,40 +126,33 @@ export async function showInventory(interaction, page = 0) {
     const payload = { content: null, embeds: [embed], components: rows };
 
     // ==========================================
-    // XỬ LÝ GỬI TIN NHẮN AN TOÀN (FIXED 10062)
+    // XỬ LÝ GỬI TIN NHẮN AN TOÀN
     // ==========================================
 
     // 1. Nếu là lệnh Slash Command gọi từ Server (Guild) -> Gửi vào DM
     if (!interaction.isButton() && interaction.guild) {
-        // [FIX]: Kiểm tra kỹ xem đã defer chưa trước khi gọi lại
         if (!interaction.deferred && !interaction.replied) {
             try {
                 await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
-            } catch (e) { return; } // Nếu defer lỗi thì bỏ qua
+            } catch (e) { return; }
         }
         
         try {
-            // Gửi tin nhắn riêng
             await interaction.user.send(payload);
-            // Báo lại ở server là đã gửi
             await interaction.editReply({ 
-                content: "✅ **Đã gửi túi đồ vào Tin nhắn riêng (DM)!**\nVui lòng kiểm tra hộp thư của bạn để quản lý Pet và Vật phẩm.",
-                embeds: [], 
-                components: [] 
+                content: "✅ **Đã gửi túi đồ vào Tin nhắn riêng (DM)!**\nVui lòng kiểm tra hộp thư của bạn.",
+                embeds: [], components: [] 
             });
         } catch (error) {
-            console.error("Không thể gửi DM:", error.message);
-            // Trường hợp user chặn DM
             await interaction.editReply({ 
-                content: "🚫 **Không thể gửi tin nhắn riêng.**\nVui lòng mở khóa DM (Direct Message) trong cài đặt quyền riêng tư của máy chủ để xem túi đồ.",
-                embeds: [], 
-                components: [] 
+                content: "🚫 **Không thể gửi tin nhắn riêng.**\nVui lòng mở khóa DM.",
+                embeds: [], components: [] 
             });
         }
         return;
     }
 
-    // 2. Nếu là Button (thao tác trong DM) hoặc lệnh gọi từ DM -> Update tin nhắn hiện tại
+    // 2. Update trong DM
     try {
         if (interaction.isButton && interaction.isButton()) {
             await interaction.update(payload).catch(() => interaction.editReply(payload));
@@ -197,7 +187,6 @@ export async function showPetDetails(interaction, petIndex) {
     const hpPercent = Math.round((p.currentHP / stats.HP) * 100);
     const mpPercent = Math.round((p.currentMP / stats.MP) * 100);
     const xpMax = p.getExpToNextLevel();
-    
     const isActive = (userData.activePetIndex === parseInt(petIndex));
 
     const embed = new EmbedBuilder()
@@ -207,23 +196,9 @@ export async function showPetDetails(interaction, petIndex) {
         .setColor(isActive ? 0x00FF00 : rarityCfg.color)
         .setThumbnail(`https://cdn.discordapp.com/emojis/${p.icon.match(/\d+/)[0]}.png`)
         .addFields(
-            { 
-                name: '📊 TRẠNG THÁI', 
-                value: `${EMOJIS.HEART} HP: ${Math.round(p.currentHP)}/${stats.HP} (${hpPercent}%)\n` +
-                       `${EMOJIS.MANA} MP: ${Math.round(p.currentMP)}/${stats.MP} (${mpPercent}%)\n` +
-                       `✨ XP: ${Math.round(p.currentExp)}/${xpMax}`,
-                inline: true 
-            },
-            {
-                name: '⚔️ CHỈ SỐ',
-                value: `ATK: ${stats.ATK} | DEF: ${stats.DEF}\nSPD: ${stats.SPD} | SATK: ${stats.SATK || 0}`,
-                inline: true
-            },
-            {
-                name: '🔥 ĐIỂM TIỀM NĂNG',
-                value: `Hiện có: **${p.statPoints || 0}** điểm\n*(Dùng nút Nâng Cấp bên dưới)*`,
-                inline: true
-            }
+            { name: '📊 TRẠNG THÁI', value: `${EMOJIS.HEART} HP: ${Math.round(p.currentHP)}/${stats.HP} (${hpPercent}%)\n` + `${EMOJIS.MANA} MP: ${Math.round(p.currentMP)}/${stats.MP} (${mpPercent}%)\n` + `✨ XP: ${Math.round(p.currentExp)}/${xpMax}`, inline: true },
+            { name: '⚔️ CHỈ SỐ', value: `ATK: ${stats.ATK} | DEF: ${stats.DEF}\nSPD: ${stats.SPD} | SATK: ${stats.SATK || 0}`, inline: true },
+            { name: '🔥 ĐIỂM TIỀM NĂNG', value: `Hiện có: **${p.statPoints || 0}** điểm\n*(Dùng nút Nâng Cấp bên dưới)*`, inline: true }
         );
 
     const skillTxt = p.skills.map((sid, i) => {
@@ -232,40 +207,33 @@ export async function showPetDetails(interaction, petIndex) {
     }).join('\n') || "_Chưa học kỹ năng nào_";
     embed.addFields({ name: '📜 KỸ NĂNG', value: skillTxt, inline: false });
 
-    // --- NÚT THAO TÁC ---
     const rowActions = new ActionRowBuilder();
-
-    // NÚT CHỌN ĐỒNG HÀNH
     rowActions.addComponents(
-        new ButtonBuilder()
-            .setCustomId(`inv_equip_${petIndex}`)
-            .setEmoji('🚩')
-            .setLabel(isActive ? 'Đang Đồng Hành' : 'Chọn Đồng Hành')
-            .setStyle(isActive ? ButtonStyle.Success : ButtonStyle.Secondary)
-            .setDisabled(isActive)
+        new ButtonBuilder().setCustomId(`inv_equip_${petIndex}`).setEmoji('🚩').setLabel(isActive ? 'Đang Đồng Hành' : 'Chọn Đồng Hành').setStyle(isActive ? ButtonStyle.Success : ButtonStyle.Secondary).setDisabled(isActive)
     );
-
     rowActions.addComponents(
         new ButtonBuilder().setCustomId(`inv_menu_feed_${petIndex}`).setEmoji(EMOJIS.CANDY_NORMAL).setLabel('Cho Ăn').setStyle(ButtonStyle.Primary),
         new ButtonBuilder().setCustomId(`inv_menu_stats_${petIndex}`).setEmoji('💪').setLabel('Nâng Cấp').setStyle(ButtonStyle.Primary),
         new ButtonBuilder().setCustomId(`inv_menu_learn_${petIndex}`).setEmoji('📚').setLabel('Học Skill').setStyle(ButtonStyle.Secondary)
     );
-
-    const rowBack = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('inv_to_main_0').setLabel('🎒 Quay lại').setStyle(ButtonStyle.Secondary)
-    );
+    const rowBack = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('inv_to_main_0').setLabel('🎒 Quay lại').setStyle(ButtonStyle.Secondary));
 
     const payload = { content: null, embeds: [embed], components: [rowActions, rowBack] };
     
-    // Cập nhật tin nhắn gốc
-    await interaction.update(payload).catch(() => interaction.editReply(payload));
+    // LOGIC AN TOÀN: Nếu đã defer/reply thì dùng editReply, chưa thì update
+    try {
+        if (interaction.deferred || interaction.replied) {
+            await interaction.editReply(payload);
+        } else {
+            await interaction.update(payload);
+        }
+    } catch (e) { console.log(e); }
 }
 
 // ==========================================
 // 3. CÁC MENU PHỤ
 // ==========================================
 
-// Menu cho ăn
 export async function showFeedMenu(interaction, petIndex) {
     const userId = interaction.user.id;
     const userData = Database.getUser(userId);
@@ -288,15 +256,18 @@ export async function showFeedMenu(interaction, petIndex) {
         new ButtonBuilder().setCustomId(`inv_feed_high_${petIndex}`).setLabel('Dùng Kẹo Cao Cấp').setStyle(ButtonStyle.Primary).setDisabled(!inv.high),
         new ButtonBuilder().setCustomId(`inv_feed_super_${petIndex}`).setLabel('Dùng Kẹo Siêu Cấp').setStyle(ButtonStyle.Primary).setDisabled(!inv.super)
     );
+    const rowBack = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`inv_show_details_${petIndex}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary));
 
-    const rowBack = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`inv_show_details_${petIndex}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary)
-    );
-
-    await interaction.update({ embeds: [embed], components: [rowCandies, rowBack] });
+    const payload = { embeds: [embed], components: [rowCandies, rowBack] };
+    try {
+        if (interaction.deferred || interaction.replied) {
+            await interaction.editReply(payload);
+        } else {
+            await interaction.update(payload);
+        }
+    } catch (e) { console.log(e); }
 }
 
-// Menu nâng cấp chỉ số
 export async function showStatUpgradeMenu(interaction, petIndex) {
     const userId = interaction.user.id;
     const userData = Database.getUser(userId);
@@ -318,67 +289,70 @@ export async function showStatUpgradeMenu(interaction, petIndex) {
 
     const rowStats = new ActionRowBuilder();
     ['hp', 'atk', 'def', 'spd', 'satk'].forEach(key => {
-        rowStats.addComponents(
-            new ButtonBuilder()
-                .setCustomId(`inv_upgrade_stat_${key}_${petIndex}`)
-                .setLabel(`+1 ${key.toUpperCase()}`)
-                .setStyle(ButtonStyle.Success)
-                .setDisabled(points <= 0)
-        );
+        rowStats.addComponents(new ButtonBuilder().setCustomId(`inv_upgrade_stat_${key}_${petIndex}`).setLabel(`+1 ${key.toUpperCase()}`).setStyle(ButtonStyle.Success).setDisabled(points <= 0));
     });
+    const rowBack = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`inv_show_details_${petIndex}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary));
 
-    const rowBack = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`inv_show_details_${petIndex}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary)
-    );
-
-    await interaction.update({ embeds: [embed], components: [rowStats, rowBack] });
+    const payload = { embeds: [embed], components: [rowStats, rowBack] };
+    try {
+        if (interaction.deferred || interaction.replied) {
+            await interaction.editReply(payload);
+        } else {
+            await interaction.update(payload);
+        }
+    } catch (e) { console.log(e); }
 }
 
-// Menu học skill
 export async function showSkillLearnMenu(interaction, petIndex) {
     const userId = interaction.user.id;
     const userData = Database.getUser(userId);
     const p = new Pet(userData.pets[petIndex]);
     
-    const embed = new EmbedBuilder()
-        .setTitle(`📚 HỌC KỸ NĂNG: ${p.name}`)
-        .setDescription("Tính năng này đang được phát triển (Cần thêm sách kỹ năng vào kho trước).")
-        .setColor(0x9B59B6);
-        
-    const rowBack = new ActionRowBuilder().addComponents(
-         new ButtonBuilder().setCustomId(`inv_show_details_${petIndex}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary)
-    );
+    const embed = new EmbedBuilder().setTitle(`📚 HỌC KỸ NĂNG: ${p.name}`).setDescription("Tính năng này đang được phát triển (Cần thêm sách kỹ năng vào kho trước).").setColor(0x9B59B6);
+    const rowBack = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`inv_show_details_${petIndex}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary));
     
-    await interaction.update({ embeds: [embed], components: [rowBack] });
+    const payload = { embeds: [embed], components: [rowBack] };
+    try {
+        if (interaction.deferred || interaction.replied) {
+            await interaction.editReply(payload);
+        } else {
+            await interaction.update(payload);
+        }
+    } catch (e) { console.log(e); }
 }
 
 // ==========================================
-// 4. XỬ LÝ LOGIC (HANDLERS)
+// 4. HANDLERS (ĐÃ SỬA LỖI)
 // ==========================================
 
 // Xử lý chọn đồng hành
 export async function handleEquipPet(interaction, petIndex) {
+    // [FIX QUAN TRỌNG]: Báo cho Discord biết là "Tôi đang xử lý" ngay lập tức
+    await interaction.deferUpdate();
+
     const userId = interaction.user.id;
     const userData = Database.getUser(userId);
     
-    // Cập nhật Active Index
     userData.activePetIndex = parseInt(petIndex);
     Database.updateUser(userId, userData);
 
     const pName = userData.pets[petIndex].name;
     
-    // Cập nhật UI trước
-    await showPetDetails(interaction, petIndex);
-
-    // Gửi thông báo
+    // Gửi thông báo (Lúc này dùng followUp mới hợp lệ vì đã deferUpdate)
     await interaction.followUp({ 
         content: `✅ Đã chọn **${pName}** làm bạn đồng hành chiến đấu!`, 
         flags: [MessageFlags.Ephemeral] 
     });
+    
+    // Cập nhật giao diện
+    await showPetDetails(interaction, petIndex);
 }
 
 // Xử lý cho ăn
 export async function handleFeed(interaction, petIndex, candyType) {
+    // [FIX QUAN TRỌNG]
+    await interaction.deferUpdate();
+
     const userId = interaction.user.id;
     const userData = Database.getUser(userId);
     const pData = userData.pets[petIndex];
@@ -407,6 +381,9 @@ export async function handleFeed(interaction, petIndex, candyType) {
 
 // Xử lý nâng stats
 export async function handleStatUpgrade(interaction, petIndex, statKey) {
+    // [FIX QUAN TRỌNG]
+    await interaction.deferUpdate();
+
     const userId = interaction.user.id;
     const userData = Database.getUser(userId);
     const p = new Pet(userData.pets[petIndex]);
@@ -425,13 +402,12 @@ export async function handleStatUpgrade(interaction, petIndex, statKey) {
 }
 
 // ==========================================
-// 5. ROUTER: XỬ LÝ TẤT CẢ NÚT BẤM TÚI ĐỒ
+// 5. ROUTER
 // ==========================================
 
 export async function handleInventoryInteraction(interaction) {
     const { customId } = interaction;
 
-    // 1. Điều hướng trang / Làm mới / Quay lại
     if (customId === 'inv_refresh') {
         await showInventory(interaction, 0);
     } 
@@ -439,20 +415,14 @@ export async function handleInventoryInteraction(interaction) {
         const page = parseInt(customId.split('_').pop());
         await showInventory(interaction, page);
     }
-    
-    // 2. Xem chi tiết Pet (Từ danh sách bấm vào)
     else if (customId.startsWith('inv_show_details_')) {
         const index = parseInt(customId.split('_').pop());
         await showPetDetails(interaction, index);
     }
-
-    // 3. Chọn Đồng Hành (Equip)
     else if (customId.startsWith('inv_equip_')) {
         const index = parseInt(customId.split('_').pop());
         await handleEquipPet(interaction, index);
     }
-
-    // 4. Các menu phụ (Cho ăn, Stats, Skill...)
     else if (customId.startsWith('inv_menu_feed_')) {
         const index = parseInt(customId.split('_').pop());
         await showFeedMenu(interaction, index);
@@ -465,20 +435,16 @@ export async function handleInventoryInteraction(interaction) {
         const index = parseInt(customId.split('_').pop());
         await showSkillLearnMenu(interaction, index);
     }
-
-    // 5. Xử lý hành động cụ thể (Ăn kẹo, Cộng điểm)
     else if (customId.startsWith('inv_feed_')) {
-        // Format: inv_feed_type_index
         const parts = customId.split('_');
         const index = parseInt(parts.pop());
-        const type = parts[2]; // normal, high, super
+        const type = parts[2]; 
         await handleFeed(interaction, index, type);
     }
     else if (customId.startsWith('inv_upgrade_stat_')) {
-        // Format: inv_upgrade_stat_key_index
         const parts = customId.split('_');
         const index = parseInt(parts.pop());
-        const key = parts[3]; // hp, atk, def...
+        const key = parts[3]; 
         await handleStatUpgrade(interaction, index, key);
     }
 }

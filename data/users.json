@@ -71,19 +71,19 @@
         "race": "Dwarf",
         "rarity": "Mythic",
         "baseStats": {
-          "HP": 1800,
+          "HP": 1830,
           "MP": 300,
           "ATK": 900,
           "SATK": 900,
           "DEF": 1500,
           "SPD": 50
         },
-        "level": 7,
-        "xp": 227,
+        "level": 9,
+        "xp": 243,
         "gen": 57,
-        "statPoints": 15,
-        "currentHP": 6019,
-        "currentMP": 1085,
+        "statPoints": 18,
+        "currentHP": 6151,
+        "currentMP": 1118,
         "skills": [
           "S1",
           "lig_buff_4",
@@ -104,7 +104,7 @@
     ],
     "inventory": {
       "candies": {
-        "normal": 15,
+        "normal": 16,
         "high": 1,
         "super": 0
       },
@@ -113,7 +113,7 @@
         "mythic": 0
       },
       "skillBooks": [],
-      "potions": 9
+      "potions": 10
     },
     "codesRedeemed": [],
     "hasClaimedStarter": true,
