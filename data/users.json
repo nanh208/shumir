@@ -32,9 +32,9 @@
         "currentMP": 116,
         "skills": [
           "S1",
-          "ear_heal_2",
-          "phy_06",
-          "gra_slow_1"
+          "wat_def_2",
+          "phy_28",
+          "ele_zap_2"
         ],
         "activeEffects": []
       }
@@ -87,9 +87,9 @@
         "currentMP": 1507,
         "skills": [
           "S1",
-          "wat_def_1",
-          "wat_heal_1",
-          "ear_blast_1"
+          "gra_shield_2",
+          "phy_26",
+          "ice_debuff_2"
         ],
         "activeEffects": []
       }

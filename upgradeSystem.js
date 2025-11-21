@@ -1,5 +1,5 @@
 // upgradeSystem.js
-const { readJSON, writeJSON } = require("./utils");
+const { readJSON, writeJSON } = require("./utils/index.js");
 const petsFile = "./data/pets.json";
 
 function levelUpPet(userId, petIdRaw, statPoints) {

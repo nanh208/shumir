@@ -2,7 +2,7 @@
 const fs = require("fs");
 const path = require("path");
 const { Events } = require("discord.js");
-const dictionary = require("../dictionary.js"); // Set chứa các từ hợp lệ
+const dictionary = require("../dictionary.cjs"); // Set chứa các từ hợp lệ
 const { activeGames, saveGames } = require("../data/activeGames.js");
 
 const prefix = "!";
