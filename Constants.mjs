@@ -1,6 +1,6 @@
 // Constants.mjs
 
-// ... (Giữ nguyên phần EMOJIS và RARITY_COLORS) ...
+// === 1. EMOJIS & COLORS ===
 export const EMOJIS = {
     PET_ICONS: [
         '<:Rayquaza:1440702434644070533>', '<:kiuri:1440702420094156851>', '<:HuTao:1440702400611618890>',
@@ -94,11 +94,8 @@ export const CANDIES = {
     HIGH:   { name: 'Kẹo Cao Cấp', xp: 1000, emoji: EMOJIS.CANDY_HIGH },
     SUPER:  { name: 'Kẹo Siêu Cấp', xp: 2000, emoji: EMOJIS.CANDY_SUPER }
 };
-// Constants.mjs (UPDATED V2)
 
-// ... (Giữ nguyên các phần EMOJIS, RARITY, ELEMENTS cũ) ...
-
-// === THÊM MỚI: HỆ THỐNG NỘI TẠI (PASSIVES) ===
+// === 7. HỆ THỐNG NỘI TẠI (PASSIVES) ===
 export const PASSIVES = {
     'VAMPIRISM': { id: 'VAMPIRISM', name: '🩸 Huyết Tộc', desc: 'Hồi 10% HP dựa trên sát thương gây ra.', trigger: 'onAttack' },
     'BERSEKER':  { id: 'BERSEKER',  name: '😡 Cuồng Nộ',  desc: 'Khi HP dưới 30%, tăng 50% Sát thương.', trigger: 'onCalcDamage' },
@@ -108,25 +105,27 @@ export const PASSIVES = {
     'CRIT_MASTER':{ id: 'CRIT_MASTER',name: '🎯 Bách Phát',desc: 'Tăng 20% tỷ lệ chí mạng.', trigger: 'onCritCheck' }
 };
 
-// === THÊM MỚI: CẤU HÌNH TIẾN HÓA ===
+// === 8. CẤU HÌNH TIẾN HÓA ===
 export const EVOLUTION_CHAINS = {
     'Pika-Chu': { target: 'Raichu-God', level: 20, material: 'Thunder Stone' },
     'Slime':    { target: 'King Slime', level: 15, material: null },
     'Dragonoid':{ target: 'Bahamut',    level: 30, material: 'Dragon Scale' }
 };
-// === 7. PET TEMPLATES (Đã thêm baseSPD và baseMP để tránh NaN) ===
+
+// === 9. PET TEMPLATES ===
 export const PET_TEMPLATES = [
     { name: "Pika-Chu", race: "Beast", baseHP: 1000, baseMP: 500, baseATK: 1050, baseSATK: 1100, baseDEF: 1000, baseSPD: 120 },
     { name: "Dragonoid", race: "Dragon", baseHP: 1200, baseMP: 600, baseATK: 1250, baseSATK: 1250, baseDEF: 1100, baseSPD: 100 },
     { name: "Slime", race: "Elemental", baseHP: 1500, baseMP: 400, baseATK: 950, baseSATK: 950, baseDEF: 1000, baseSPD: 80 },
+    { name: "King Slime", race: "Elemental", baseHP: 3500, baseMP: 1200, baseATK: 2800, baseSATK: 2500, baseDEF: 3000, baseSPD: 110, passive: 'VAMPIRISM' }, 
     { name: "Knight", race: "Human", baseHP: 1100, baseMP: 450, baseATK: 1150, baseSATK: 900, baseDEF: 1050, baseSPD: 95 },
     { name: "Spirit", race: "Elf", baseHP: 900, baseMP: 800, baseATK: 1000, baseSATK: 1300, baseDEF: 950, baseSPD: 110 },
-    // Golem đã được thêm baseSPD
     { name: "Golem", race: "Dwarf", baseHP: 1800, baseMP: 300, baseATK: 900, baseSATK: 900, baseDEF: 1500, baseSPD: 50 },
     { name: "Wisp", race: "Elemental", baseHP: 800, baseMP: 700, baseATK: 1200, baseSATK: 1300, baseDEF: 850, baseSPD: 130 },
     { name: "Shadow", race: "Unknown", baseHP: 1000, baseMP: 500, baseATK: 1300, baseSATK: 1100, baseDEF: 1000, baseSPD: 115 }
 ];
-// === 8. SKILLS ===
+
+// === 10. SKILLS ===
 export const SKILLS = [
     { id: 'S1', name: 'Tát Nước', element: 'Water', type: 'SATK', power: 25, multiplier: 1 },
     { id: 'S2', name: 'Đốt Cháy', element: 'Fire', type: 'SATK', power: 30, multiplier: 0.9 },
@@ -134,3 +133,10 @@ export const SKILLS = [
     { id: 'S4', name: 'Đấm Mạnh', element: 'Physical', type: 'ATK', power: 20, multiplier: 1.0 },
     { id: 'S5', name: 'Sấm Sét', element: 'Thunder', type: 'SATK', power: 40, multiplier: 0.8 },
 ];
+
+// 💡 BỔ SUNG: SKILLBOOK CONFIG ĐỂ SỬA LỖI
+export const SKILLBOOK_CONFIG = {
+    'S_Fire': { name: 'Sách Lửa 🔥', skillId: 'S2', rarity: 'Rare', icon: '🔥' }, 
+    'S_Heal': { name: 'Sách Hồi Máu 💖', skillId: 'S3', rarity: 'Common', icon: '💖' },
+    'S_Epic': { name: 'Sách Sử Thi ✨', skillId: 'S4', rarity: 'Epic', icon: '✨' }
+};

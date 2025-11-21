@@ -1,529 +1,484 @@
-// InventoryUI.js (FINAL VERSION - TÍCH HỢP PET LIST & PET INFO VÀ CHỌN TRỰC TIẾP BẰNG BUTTON)
-import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } from 'discord.js';
+import { 
+    EmbedBuilder, 
+    ActionRowBuilder, 
+    ButtonBuilder, 
+    ButtonStyle, 
+    MessageFlags,
+    StringSelectMenuBuilder, 
+    StringSelectMenuOptionBuilder 
+} from 'discord.js';
+
 import { Database } from './Database.mjs';
-import { Pet } from './Pet.mjs'; 
+import { Pet } from './GameLogic.mjs'; 
 import { getSkillById } from './SkillList.mjs'; 
-import { RARITY_CONFIG } from './Constants.mjs';
+import { 
+    EMOJIS, 
+    RARITY_COLORS, 
+    RARITY_CONFIG, 
+    CANDIES, 
+    ELEMENT_ICONS,
+    SKILLBOOK_CONFIG 
+} from './Constants.mjs';
 
-const ITEMS_PER_PAGE = 5; // Số pet hiển thị mỗi trang
-const MAX_PET_LEVEL = 100; // Cấp độ Pet tối đa
-const POINTS_PER_LEVEL = 3; // 3 điểm Stat Points mỗi level up
-
-// --- CONFIG CÁC LOẠI KẸO VÀ SKILLBOOK ---
-const CANDY_CONFIG = {
-    'normal': { name: 'Kẹo thường 🍬', exp: 50 },
-    'high': { name: 'Kẹo cao cấp 🍭', exp: 200 }
-};
-
-const SKILLBOOK_CONFIG = {
-    'S_Fire': { name: 'Sách Lửa 🔥', skillId: 'S2', rarity: 'Rare', icon: '🔥' }, 
-    'S_Heal': { name: 'Sách Hồi Máu 💖', skillId: 'S3', rarity: 'Common', icon: '💖' },
-    'S_Epic': { name: 'Sách Sử Thi ✨', skillId: 'S4', rarity: 'Epic', icon: '✨' }
-};
+const ITEMS_PER_PAGE = 5; 
+const POINTS_PER_LEVEL = 3;
 
 // ==========================================
-// 1. GIAO DIỆN CHÍNH (TÚI ĐỒ VÀ DANH SÁCH PET)
+// 0. HELPER FUNCTIONS (HỖ TRỢ UI)
+// ==========================================
+
+function createProgressBar(current, max, totalChars = 10) {
+    const percent = Math.max(0, Math.min(current / max, 1));
+    const filled = Math.round(percent * totalChars);
+    const empty = totalChars - filled;
+    return '🟦'.repeat(filled) + '⬜'.repeat(empty); 
+}
+
+// ==========================================
+// 1. GIAO DIỆN CHÍNH: TÚI ĐỒ & KHO PET
 // ==========================================
 
 export async function showInventory(interaction, page = 0) {
-    // ⚠️ FIX LỖI NAN: Đảm bảo page luôn là số nguyên
-    page = parseInt(page) || 0; 
-    
+    // Lấy thông tin người dùng và dữ liệu
     const userId = interaction.user.id;
     const userData = Database.getUser(userId);
-    const pets = userData.pets;
+    page = parseInt(page) || 0;
+    
+    // Đảm bảo có activePetIndex
+    if (userData.activePetIndex === undefined) userData.activePetIndex = 0;
+
+    if (!userData.inventory) userData.inventory = { candies: {}, skillbooks: {}, crates: {} };
     const inv = userData.inventory;
-    
-    inv.skillbooks = inv.skillbooks || {}; 
+    const pets = userData.pets || [];
 
-    // 1. Xây dựng mô tả Vật phẩm
-    let itemDesc = "—---------------------------------------\n";
-    itemDesc += `**KẸO KINH NGHIỆM:**\n`;
-    itemDesc += `🍬 Kẹo thường: **${inv.candies.normal}** (Tăng ${CANDY_CONFIG.normal.exp} XP)\n`;
-    itemDesc += `🍭 Kẹo cao cấp: **${inv.candies.high}** (Tăng ${CANDY_CONFIG.high.exp} XP)\n`;
-    
-    itemDesc += `\n**SÁCH KỸ NĂNG:**\n`;
-    let hasSkillBook = false;
-    for (const key in SKILLBOOK_CONFIG) {
-        if (inv.skillbooks[key] > 0) {
-            hasSkillBook = true;
-            const skillName = getSkillById(SKILLBOOK_CONFIG[key].skillId)?.name || 'Skill';
-            itemDesc += `📖 ${SKILLBOOK_CONFIG[key].name} (${skillName}): **${inv.skillbooks[key]}**\n`;
-        }
-    }
-    if (!hasSkillBook) {
-        itemDesc += `*Chưa có sách kỹ năng.*\n`;
-    }
-    
-    itemDesc += `\n**VẬT PHẨM KHÁC:**\n`;
-    itemDesc += `📦 Hòm Thường: **${inv.crates.common || 0}**\n`;
-    itemDesc += "—----------------------------------------\n";
+    // --- TẠO NỘI DUNG EMBED (ITEM LIST) ---
+    let itemDesc = `**${EMOJIS.STAR} VẬT PHẨM TIÊU THỤ:**\n`;
+    const candyList = [
+        { key: 'normal', cfg: CANDIES.NORMAL },
+        { key: 'high', cfg: CANDIES.HIGH },
+        { key: 'super', cfg: CANDIES.SUPER || { name: 'Kẹo Siêu Cấp', emoji: '🍮' } }
+    ];
+    let hasCandy = false;
+    candyList.forEach(c => {
+        const qty = inv.candies[c.key] || 0;
+        if (qty > 0) { itemDesc += `${c.cfg.emoji} **${c.cfg.name}**: \`${qty}\`\n`; hasCandy = true; }
+    });
+    if (!hasCandy) itemDesc += "*Không có kẹo nào.*\n";
+    itemDesc += `\n**${EMOJIS.BOX_COMMON} VẬT PHẨM KHÁC:**\n💊 Thuốc Hồi Phục: \`${inv.potions || 0}\`\n`;
 
-
-    // 2. Thông tin Danh sách Pet (Pet List)
+    // --- TẠO NỘI DUNG EMBED (PET LIST) ---
     const totalPages = Math.ceil(pets.length / ITEMS_PER_PAGE);
+    if (page >= totalPages && totalPages > 0) page = totalPages - 1;
+    
     const start = page * ITEMS_PER_PAGE;
     const end = start + ITEMS_PER_PAGE;
     const currentPets = pets.slice(start, end);
 
     let petListDesc = "";
     if (pets.length === 0) {
-        petListDesc = "*Bạn chưa có Pet nào.*";
+        petListDesc = "🚫 *Bạn chưa sở hữu Pet nào.*";
     } else {
-        petListDesc = `**DANH SÁCH PET (${pets.length} / 10)**\n`;
         currentPets.forEach((pData, index) => {
             const p = new Pet(pData);
-            // Hiển thị Pet ID ngắn gọn
-            const shortId = p.id.slice(0, 4); 
-            petListDesc += `**[${start + index + 1}.]** ${p.icon} **${p.name}** Lv.${p.level} [Gen: ${p.gen}] - *ID:${shortId}*\n`;
+            const absoluteIndex = start + index;
+            const rIcon = RARITY_CONFIG[p.rarity]?.icon || '⚪';
+            const eIcon = ELEMENT_ICONS[p.element] || '';
+            
+            // HIỂN THỊ TRẠNG THÁI ĐỒNG HÀNH
+            const isActive = (userData.activePetIndex === absoluteIndex);
+            const statusIcon = isActive ? '🚩 **[Đang chọn]**' : (p.deathTime ? '💀' : '');
+            
+            petListDesc += `**\`[${absoluteIndex + 1}]\`** ${rIcon} **${p.name}** (Lv.${p.level}) ${eIcon} ${statusIcon}\n`;
         });
     }
 
     const embed = new EmbedBuilder()
-        .setTitle(`🎒 TÚI ĐỒ CỦA ${interaction.user.username}`)
-        .setDescription(itemDesc) 
-        .addFields({ name: 'Pets', value: petListDesc, inline: false })
-        .setColor(0x0099FF)
-        .setFooter({ text: `Trang ${page + 1}/${totalPages || 1}` });
+        .setTitle(`🎒 TÚI ĐỒ CỦA ${interaction.user.username.toUpperCase()}`)
+        .setColor(0xF1C40F)
+        .setThumbnail(interaction.user.displayAvatarURL())
+        .addFields(
+            { name: '📦 KHO VẬT PHẨM', value: itemDesc, inline: true },
+            { name: `🐾 DANH SÁCH THÚ CƯNG (${pets.length}/10)`, value: petListDesc, inline: false }
+        )
+        .setFooter({ text: `Trang ${page + 1}/${totalPages || 1} • (Tương tác trong tin nhắn riêng)` });
 
-    // 3. Tạo nút điều hướng và Nút CHỌN PET (Tích hợp)
-    
-    // 3a. Hàng Điều hướng trang
-    const rowNav = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`inv_prev_${page}`)
-            .setLabel('◀️ Trang trước')
-            .setStyle(ButtonStyle.Secondary)
-            .setDisabled(page === 0), 
-        new ButtonBuilder()
-            .setCustomId('inv_refresh')
-            .setLabel('🔄 Làm mới')
-            .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`inv_next_${page}`)
-            .setLabel('Trang sau ▶️')
-            .setStyle(ButtonStyle.Secondary)
-            .setDisabled(page >= totalPages - 1 || totalPages === 0)
-    );
-    
-    // 3b. Hàng nút Pet hiện tại (Mỗi hàng 5 nút)
-    let components = [rowNav];
+    const rows = [];
+    rows.push(new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`inv_prev_${page}`).setEmoji('◀️').setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
+        new ButtonBuilder().setCustomId('inv_refresh').setEmoji('🔄').setLabel('Làm mới').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`inv_next_${page}`).setEmoji('▶️').setStyle(ButtonStyle.Secondary).setDisabled(page >= totalPages - 1 || totalPages === 0)
+    ));
 
-    if (pets.length > 0) {
+    if (currentPets.length > 0) {
         const petButtons = new ActionRowBuilder();
-        currentPets.forEach((petData, index) => {
+        currentPets.forEach((pData, index) => {
             const absoluteIndex = start + index;
-            const pet = new Pet(petData);
+            const pName = pData.nickname || pData.name;
+            const isActive = (userData.activePetIndex === absoluteIndex);
             
             petButtons.addComponents(
                 new ButtonBuilder()
                     .setCustomId(`inv_show_details_${absoluteIndex}`)
-                    .setLabel(`${pet.icon} ${pet.name} Lv.${pet.level}`)
-                    .setStyle(ButtonStyle.Primary)
+                    .setLabel(`${absoluteIndex + 1}. ${pName}`)
+                    .setStyle(isActive ? ButtonStyle.Success : (pData.deathTime ? ButtonStyle.Danger : ButtonStyle.Secondary))
             );
         });
-        components.push(petButtons);
+        rows.push(petButtons);
     }
 
+    const payload = { content: null, embeds: [embed], components: rows };
 
-    const payload = { embeds: [embed], components: components };
-    
-    // Nếu tương tác là một button trong Inventory, ta update
-    if (interaction.message && interaction.customId && (interaction.customId.startsWith('inv_') || interaction.customId === 'inv_refresh')) {
-        await interaction.update(payload);
-    } else {
-        // Nếu là lệnh /inventory mới, ta reply ephemeral
-        await interaction.reply({ ...payload, ephemeral: true });
+    // ==========================================
+    // XỬ LÝ GỬI TIN NHẮN AN TOÀN (FIXED 10062)
+    // ==========================================
+
+    // 1. Nếu là lệnh Slash Command gọi từ Server (Guild) -> Gửi vào DM
+    if (!interaction.isButton() && interaction.guild) {
+        // [FIX]: Kiểm tra kỹ xem đã defer chưa trước khi gọi lại
+        if (!interaction.deferred && !interaction.replied) {
+            try {
+                await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+            } catch (e) { return; } // Nếu defer lỗi thì bỏ qua
+        }
+        
+        try {
+            // Gửi tin nhắn riêng
+            await interaction.user.send(payload);
+            // Báo lại ở server là đã gửi
+            await interaction.editReply({ 
+                content: "✅ **Đã gửi túi đồ vào Tin nhắn riêng (DM)!**\nVui lòng kiểm tra hộp thư của bạn để quản lý Pet và Vật phẩm.",
+                embeds: [], 
+                components: [] 
+            });
+        } catch (error) {
+            console.error("Không thể gửi DM:", error.message);
+            // Trường hợp user chặn DM
+            await interaction.editReply({ 
+                content: "🚫 **Không thể gửi tin nhắn riêng.**\nVui lòng mở khóa DM (Direct Message) trong cài đặt quyền riêng tư của máy chủ để xem túi đồ.",
+                embeds: [], 
+                components: [] 
+            });
+        }
+        return;
+    }
+
+    // 2. Nếu là Button (thao tác trong DM) hoặc lệnh gọi từ DM -> Update tin nhắn hiện tại
+    try {
+        if (interaction.isButton && interaction.isButton()) {
+            await interaction.update(payload).catch(() => interaction.editReply(payload));
+        } else {
+            if (!interaction.deferred && !interaction.replied) {
+                await interaction.reply(payload);
+            } else {
+                await interaction.editReply(payload);
+            }
+        }
+    } catch (e) {
+        console.log("⚠️ Ignore inventory update error:", e.message);
     }
 }
 
-// -------------------------------------------------------------
-// *HÀM THAY THẾ CHO SELECT PET VÀ ĐIỀU HƯỚNG*
-// -------------------------------------------------------------
-
+// ==========================================
+// 2. CHI TIẾT PET & CHỌN ĐỒNG HÀNH
+// ==========================================
 
 export async function showPetDetails(interaction, petIndex) {
     const userId = interaction.user.id;
     const userData = Database.getUser(userId);
-    const pets = userData.pets;
-    const petData = pets[petIndex];
-    
-    if (!petData) {
-        return interaction.reply({ content: "🚫 Pet không hợp lệ.", ephemeral: true });
-    }
-    
-    const pet = new Pet(petData);
-    const stats = pet.getStats();
-    
-    // ĐIỂM MỚI: Lượng máu còn lại và Stat Points
-    const currentHP = pet.currentHP || stats.HP;
-    const currentMP = pet.currentMP || stats.MP;
-    const statPoints = pet.statPoints || 0;
+    const petData = userData.pets[petIndex];
 
-    const currentExp = pet.currentExp || 0;
-    const expToNextLevel = pet.getExpToNextLevel();
-    
-    // Lấy rank của Pet (cần RARITY_CONFIG)
-    const petRarityInfo = RARITY_CONFIG[pet.rarity];
-    const petRarity = petRarityInfo ? petRarityInfo.icon + ' ' + pet.rarity : petRarityInfo.name;
+    if (!petData) return interaction.reply({ content: "🚫 Pet không tồn tại.", flags: [MessageFlags.Ephemeral] });
 
-    // 1. Xây dựng Embed thông tin Pet
-    const skillList = pet.skills.map(sid => {
-        const skill = getSkillById(sid);
-        return `\`${sid}\` ${skill?.name || 'Unknown'}`;
-    }).join(', ') || '*Chưa có skill nào.*';
+    const p = new Pet(petData);
+    const stats = p.getStats();
+    const rarityCfg = RARITY_CONFIG[p.rarity] || RARITY_CONFIG['Common'];
+    const elementIcon = ELEMENT_ICONS[p.element] || '❓';
+
+    const hpPercent = Math.round((p.currentHP / stats.HP) * 100);
+    const mpPercent = Math.round((p.currentMP / stats.MP) * 100);
+    const xpMax = p.getExpToNextLevel();
+    
+    const isActive = (userData.activePetIndex === parseInt(petIndex));
 
     const embed = new EmbedBuilder()
-        .setTitle(`✨ [Lv.${pet.level}] ${pet.icon} ${pet.name.toUpperCase()}`)
-        .setDescription(
-            `**Hạng:** ${petRarity} | **Gen:** ${pet.gen}/100 🧬 | **Hệ:** ${pet.element}\n` +
-            `**XP:** ${currentExp} / ${expToNextLevel} (${(currentExp / expToNextLevel * 100).toFixed(1)}%)`
-        )
+        .setTitle(`${rarityCfg.icon} ${p.name.toUpperCase()} [Lv.${p.level}] ${isActive ? '🚩 (ĐỒNG HÀNH)' : ''}`)
+        .setDescription(`*${p.getRace()}* • **${p.element}** ${elementIcon}\n` + 
+                        `🧬 **Gen:** ${p.gen}/100 | ⭐ **Rank:** ${p.rarity}`)
+        .setColor(isActive ? 0x00FF00 : rarityCfg.color)
+        .setThumbnail(`https://cdn.discordapp.com/emojis/${p.icon.match(/\d+/)[0]}.png`)
         .addFields(
             { 
-                name: '❤️ Máu & MP', 
-                value: `HP: **${Math.round(currentHP)}/${stats.HP}** | MP: **${Math.round(currentMP)}/${stats.MP}**`,
-                inline: false 
-            },
-            {
-                name: '📊 Chỉ số Chiến đấu', 
-                value: `⚔️ ATK: **${stats.ATK}** | 🪄 SATK: **${stats.SATK || stats.MATK || 0}**\n` + 
-                       `🛡️ DEF: **${stats.DEF}** | ⚡ SPD: **${stats.SPD}**`,
+                name: '📊 TRẠNG THÁI', 
+                value: `${EMOJIS.HEART} HP: ${Math.round(p.currentHP)}/${stats.HP} (${hpPercent}%)\n` +
+                       `${EMOJIS.MANA} MP: ${Math.round(p.currentMP)}/${stats.MP} (${mpPercent}%)\n` +
+                       `✨ XP: ${Math.round(p.currentExp)}/${xpMax}`,
                 inline: true 
             },
             {
-                name: '🎓 Kỹ năng',
-                value: skillList,
+                name: '⚔️ CHỈ SỐ',
+                value: `ATK: ${stats.ATK} | DEF: ${stats.DEF}\nSPD: ${stats.SPD} | SATK: ${stats.SATK || 0}`,
                 inline: true
             },
             {
-                name: `🔥 Điểm nâng cấp còn lại: ${statPoints}`,
-                value: statPoints > 0 ? `*Sử dụng nút "Nâng cấp chỉ số" bên dưới.*` : `*Lên cấp để nhận thêm ${POINTS_PER_LEVEL} điểm.*`,
-                inline: false
+                name: '🔥 ĐIỂM TIỀM NĂNG',
+                value: `Hiện có: **${p.statPoints || 0}** điểm\n*(Dùng nút Nâng Cấp bên dưới)*`,
+                inline: true
             }
-        )
-        .setColor(0x3498DB);
+        );
 
-    // 2. Tạo nút hành động chính
-    const rowActions = new ActionRowBuilder().addComponents(
+    const skillTxt = p.skills.map((sid, i) => {
+        const s = getSkillById(sid);
+        return `\`[${i+1}]\` **${s?.name || sid}**`;
+    }).join('\n') || "_Chưa học kỹ năng nào_";
+    embed.addFields({ name: '📜 KỸ NĂNG', value: skillTxt, inline: false });
+
+    // --- NÚT THAO TÁC ---
+    const rowActions = new ActionRowBuilder();
+
+    // NÚT CHỌN ĐỒNG HÀNH
+    rowActions.addComponents(
         new ButtonBuilder()
-            .setCustomId(`inv_menu_feed_${petIndex}`) // Chuyển đến menu cho ăn
-            .setLabel('🍬 Cho Pet Ăn (XP)')
-            .setStyle(ButtonStyle.Primary),
-        new ButtonBuilder()
-            .setCustomId(`inv_menu_stats_${petIndex}`) // Chuyển đến menu nâng cấp chỉ số
-            .setLabel('⬆️ Nâng cấp Chỉ số')
-            .setStyle(ButtonStyle.Secondary)
-            .setDisabled(statPoints === 0), // Chỉ cho phép nâng cấp khi có điểm
-        new ButtonBuilder()
-            .setCustomId(`inv_menu_learn_${petIndex}`) // Chuyển đến menu học skill
-            .setLabel('📚 Học Kỹ năng')
-            .setStyle(ButtonStyle.Success)
+            .setCustomId(`inv_equip_${petIndex}`)
+            .setEmoji('🚩')
+            .setLabel(isActive ? 'Đang Đồng Hành' : 'Chọn Đồng Hành')
+            .setStyle(isActive ? ButtonStyle.Success : ButtonStyle.Secondary)
+            .setDisabled(isActive)
     );
 
-    // 3. Nút Quay lại
+    rowActions.addComponents(
+        new ButtonBuilder().setCustomId(`inv_menu_feed_${petIndex}`).setEmoji(EMOJIS.CANDY_NORMAL).setLabel('Cho Ăn').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId(`inv_menu_stats_${petIndex}`).setEmoji('💪').setLabel('Nâng Cấp').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId(`inv_menu_learn_${petIndex}`).setEmoji('📚').setLabel('Học Skill').setStyle(ButtonStyle.Secondary)
+    );
+
     const rowBack = new ActionRowBuilder().addComponents(
-         new ButtonBuilder()
-            .setCustomId(`inv_to_main_0`) 
-            .setLabel('⬅️ Quay lại Túi đồ')
-            .setStyle(ButtonStyle.Secondary)
+        new ButtonBuilder().setCustomId('inv_to_main_0').setLabel('🎒 Quay lại').setStyle(ButtonStyle.Secondary)
     );
 
-    const payload = { embeds: [embed], components: [rowActions, rowBack], ephemeral: true };
+    const payload = { content: null, embeds: [embed], components: [rowActions, rowBack] };
     
-    // Nếu tương tác là nút Pet chi tiết, Feed, Stat, Learn, ta update
-    if (interaction.customId.startsWith('inv_show_details_') || interaction.customId.startsWith('inv_menu_')) {
-        await interaction.update(payload);
-    } else {
-        await interaction.reply(payload);
-    }
+    // Cập nhật tin nhắn gốc
+    await interaction.update(payload).catch(() => interaction.editReply(payload));
 }
 
 // ==========================================
-// 3. CÁC SUB-MENU NÂNG CẤP
+// 3. CÁC MENU PHỤ
 // ==========================================
 
+// Menu cho ăn
 export async function showFeedMenu(interaction, petIndex) {
     const userId = interaction.user.id;
     const userData = Database.getUser(userId);
-    const petData = userData.pets[petIndex];
-    const pet = new Pet(petData);
-    
-    if (pet.level >= MAX_PET_LEVEL) {
-        return interaction.reply({ content: `🚫 ${pet.name} đã đạt cấp độ tối đa (${MAX_PET_LEVEL})!`, ephemeral: true });
-    }
+    const p = new Pet(userData.pets[petIndex]);
+    const inv = userData.inventory.candies;
+    const maxLv = RARITY_CONFIG[p.rarity]?.maxLv || 100;
 
-    const canUseNormalCandy = userData.inventory.candies.normal > 0;
-    const canUseHighCandy = userData.inventory.candies.high > 0;
+    const embed = new EmbedBuilder()
+        .setTitle(`🍽️ CHO ${p.name.toUpperCase()} ĂN`)
+        .setDescription(`Cấp độ hiện tại: **${p.level}/${maxLv}**\nXP hiện tại: \`${p.currentExp}/${p.getExpToNextLevel()}\`\n\n**Chọn loại kẹo muốn sử dụng:**`)
+        .setColor(0x00FF00)
+        .addFields(
+            { name: `${EMOJIS.CANDY_NORMAL} Kẹo Thường`, value: `Còn: **${inv.normal || 0}**\nXP: +${CANDIES.NORMAL.xp}`, inline: true },
+            { name: `${EMOJIS.CANDY_HIGH} Kẹo Cao Cấp`, value: `Còn: **${inv.high || 0}**\nXP: +${CANDIES.HIGH.xp}`, inline: true },
+            { name: `${EMOJIS.CANDY_SUPER || '🍮'} Kẹo Siêu Cấp`, value: `Còn: **${inv.super || 0}**\nXP: +${CANDIES.SUPER?.xp || 2000}`, inline: true }
+        );
 
-    const rowCandy = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`inv_feed_normal_${petIndex}`)
-            .setLabel(`🍬 Kẹo thường (${CANDY_CONFIG.normal.exp} XP)`)
-            .setStyle(ButtonStyle.Primary)
-            .setDisabled(!canUseNormalCandy),
-        new ButtonBuilder()
-            .setCustomId(`inv_feed_high_${petIndex}`)
-            .setLabel(`🍭 Kẹo cao cấp (${CANDY_CONFIG.high.exp} XP)`)
-            .setStyle(ButtonStyle.Danger)
-            .setDisabled(!canUseHighCandy)
+    const rowCandies = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`inv_feed_normal_${petIndex}`).setLabel('Dùng Kẹo Thường').setStyle(ButtonStyle.Primary).setDisabled(!inv.normal),
+        new ButtonBuilder().setCustomId(`inv_feed_high_${petIndex}`).setLabel('Dùng Kẹo Cao Cấp').setStyle(ButtonStyle.Primary).setDisabled(!inv.high),
+        new ButtonBuilder().setCustomId(`inv_feed_super_${petIndex}`).setLabel('Dùng Kẹo Siêu Cấp').setStyle(ButtonStyle.Primary).setDisabled(!inv.super)
     );
-    
+
     const rowBack = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-           .setCustomId(`inv_show_details_${petIndex}`) 
-           .setLabel('⬅️ Quay lại Pet Info')
-           .setStyle(ButtonStyle.Secondary)
+        new ButtonBuilder().setCustomId(`inv_show_details_${petIndex}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary)
     );
 
-    await interaction.update({
-        content: `**CHO ${pet.icon} ${pet.name.toUpperCase()} ĂN:**\nXP hiện tại: ${pet.currentExp || 0}/${pet.getExpToNextLevel()}`,
-        embeds: [],
-        components: [rowCandy, rowBack],
-        ephemeral: true
-    });
+    await interaction.update({ embeds: [embed], components: [rowCandies, rowBack] });
 }
 
+// Menu nâng cấp chỉ số
 export async function showStatUpgradeMenu(interaction, petIndex) {
     const userId = interaction.user.id;
     const userData = Database.getUser(userId);
-    const petData = userData.pets[petIndex];
-    const pet = new Pet(petData);
-    const statPoints = pet.statPoints || 0;
-    const stats = pet.getStats();
+    const p = new Pet(userData.pets[petIndex]);
+    const stats = p.getStats();
+    const points = p.statPoints || 0;
 
-    if (statPoints <= 0) {
-        // Nếu không còn điểm, chuyển về menu Pet Info
-        await interaction.update({ content: `🚫 ${pet.name} không có điểm nâng cấp.`, embeds: [], components: [], ephemeral: true });
-        return showPetDetails(interaction, petIndex);
-    }
-    
-    const fields = [
-        { emoji: '❤️', stat: 'HP', current: stats.HP, key: 'hp' },
-        { emoji: '⚔️', stat: 'ATK', current: stats.ATK, key: 'atk' },
-        { emoji: '🪄', stat: 'SATK', current: stats.SATK || stats.MATK || 0, key: 'satk' },
-        { emoji: '🛡️', stat: 'DEF', current: stats.DEF, key: 'def' },
-        { emoji: '⚡', stat: 'SPD', current: stats.SPD, key: 'spd' }
-    ];
+    const embed = new EmbedBuilder()
+        .setTitle(`💪 NÂNG CẤP CHỈ SỐ: ${p.name}`)
+        .setDescription(`Điểm tiềm năng: **${points}**\n\nChọn chỉ số muốn cộng (Tốn 1 điểm/lần):`)
+        .setColor(0xE67E22)
+        .addFields(
+            { name: `${EMOJIS.HEART} HP`, value: `${stats.HP}`, inline: true },
+            { name: `${EMOJIS.SWORD} ATK`, value: `${stats.ATK}`, inline: true },
+            { name: `${EMOJIS.SHIELD} DEF`, value: `${stats.DEF}`, inline: true },
+            { name: `${EMOJIS.SPEED} SPD`, value: `${stats.SPD}`, inline: true },
+            { name: `🔮 SATK`, value: `${stats.SATK || stats.MATK || 0}`, inline: true }
+        );
 
-    const statButtons = new ActionRowBuilder();
-    
-    let description = `**ĐIỂM CÒN LẠI: ${statPoints}**\n\n`;
-    
-    fields.forEach(f => {
-        description += `${f.emoji} ${f.stat}: **${f.current}**\n`;
-        statButtons.addComponents(
+    const rowStats = new ActionRowBuilder();
+    ['hp', 'atk', 'def', 'spd', 'satk'].forEach(key => {
+        rowStats.addComponents(
             new ButtonBuilder()
-                .setCustomId(`inv_upgrade_stat_${f.key}_${petIndex}`)
-                .setLabel(`+1 ${f.stat}`)
-                .setStyle(ButtonStyle.Primary)
-                .setDisabled(statPoints === 0)
+                .setCustomId(`inv_upgrade_stat_${key}_${petIndex}`)
+                .setLabel(`+1 ${key.toUpperCase()}`)
+                .setStyle(ButtonStyle.Success)
+                .setDisabled(points <= 0)
         );
     });
 
     const rowBack = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-           .setCustomId(`inv_show_details_${petIndex}`) 
-           .setLabel('⬅️ Quay lại Pet Info')
-           .setStyle(ButtonStyle.Secondary)
+        new ButtonBuilder().setCustomId(`inv_show_details_${petIndex}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary)
     );
 
-    await interaction.update({
-        content: `**NÂNG CẤP CHỈ SỐ CHO ${pet.icon} ${pet.name.toUpperCase()}**\n\n${description}`,
-        embeds: [],
-        components: [statButtons, rowBack],
-        ephemeral: true
-    });
+    await interaction.update({ embeds: [embed], components: [rowStats, rowBack] });
 }
 
+// Menu học skill
 export async function showSkillLearnMenu(interaction, petIndex) {
     const userId = interaction.user.id;
     const userData = Database.getUser(userId);
-    const petData = userData.pets[petIndex];
-    const pet = new Pet(petData);
+    const p = new Pet(userData.pets[petIndex]);
     
-    const invSkillBooks = userData.inventory.skillbooks || {};
-    // Lấy Rank của Pet (giả định RARITY_CONFIG có rank số)
-    const petRarityRank = RARITY_CONFIG[pet.rarity].rank; 
-    const petRarity = RARITY_CONFIG[pet.rarity].icon + ' ' + pet.rarity;
-
-    // 1. Hiển thị Skill hiện tại
-    let skillDesc = pet.skills.map((sid, index) => {
-        const skill = getSkillById(sid);
-        return `**[Slot ${index + 1}]** ${skill?.name || 'Unknown'} (\`${sid}\`)`;
-    }).join('\n');
-    
-    skillDesc = `**SKILL ĐANG CÓ (Slot ${pet.skills.length}/4):**\n${skillDesc}`;
-    if (pet.skills.length < 4) {
-        skillDesc += `\n**[Slot ${pet.skills.length + 1}]** *Slot trống...*`;
-    }
-    
-    let bookOptions = [];
-    
-    // 2. Tạo nút cho Sách Skill
-    for (const key in SKILLBOOK_CONFIG) {
-        const book = SKILLBOOK_CONFIG[key];
-        const count = invSkillBooks[key] || 0;
-        const bookRarityRank = RARITY_CONFIG[book.rarity].rank;
+    const embed = new EmbedBuilder()
+        .setTitle(`📚 HỌC KỸ NĂNG: ${p.name}`)
+        .setDescription("Tính năng này đang được phát triển (Cần thêm sách kỹ năng vào kho trước).")
+        .setColor(0x9B59B6);
         
-        // RÀNG BUỘC: Không thể học sách rank cao hơn Pet
-        const canUse = count > 0 && petRarityRank >= bookRarityRank;
-        const isTooHighRank = petRarityRank < bookRarityRank;
-        
-        if (count > 0) {
-            bookOptions.push(
-                new StringSelectMenuOptionBuilder()
-                    .setLabel(`${book.icon} ${book.name} (${book.rarity}) [Còn ${count}]`)
-                    .setValue(key)
-                    .setDescription(isTooHighRank ? `Rank Pet (${pet.rarity}) quá thấp!` : `Sử dụng để học skill`)
-                    .setDisabled(!canUse)
-            );
-        }
-    }
-    
-    // 3. Tạo Menu Chọn Sách
-    const rowSelectBook = new ActionRowBuilder();
-    if (bookOptions.length > 0) {
-        rowSelectBook.addComponents(
-            new StringSelectMenuBuilder()
-                .setCustomId(`inv_select_book_${petIndex}`)
-                .setPlaceholder('1. Chọn Sách Skill muốn dùng...')
-                .addOptions(bookOptions)
-        );
-    } else {
-         skillDesc += `\n\n*🚫 Bạn không có sách kỹ năng nào phù hợp.*`;
-    }
-    
-    // 4. Tạo Nút Chọn Slot
-    const slotOptions = pet.skills.map((sid, index) => {
-        const skill = getSkillById(sid);
-        return new StringSelectMenuOptionBuilder()
-            .setLabel(`Slot ${index + 1}: ${skill?.name || 'Unknown'} (Thay thế)`)
-            .setValue(`${index}`); // Lưu index (0-3)
-    }).concat(pet.skills.length < 4 ? [new StringSelectMenuOptionBuilder().setLabel(`Slot ${pet.skills.length + 1}: (Học mới)`).setValue(`${pet.skills.length}`)] : []);
-    
-    const rowSelectSlot = new ActionRowBuilder().addComponents(
-        new StringSelectMenuBuilder()
-            .setCustomId(`inv_select_slot_${petIndex}`)
-            .setPlaceholder('2. Chọn Vị trí Skill muốn thay thế/học...')
-            .addOptions(slotOptions)
-    );
-
     const rowBack = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-           .setCustomId(`inv_show_details_${petIndex}`) 
-           .setLabel('⬅️ Quay lại Pet Info')
-           .setStyle(ButtonStyle.Secondary)
+         new ButtonBuilder().setCustomId(`inv_show_details_${petIndex}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary)
     );
+    
+    await interaction.update({ embeds: [embed], components: [rowBack] });
+}
 
-    await interaction.update({
-        content: `**HỌC KỸ NĂNG CHO ${pet.icon} ${pet.name.toUpperCase()}** (Rank Pet: ${petRarity})\n\n${skillDesc}`,
-        embeds: [],
-        components: [rowSelectBook, rowSelectSlot, rowBack],
-        ephemeral: true
+// ==========================================
+// 4. XỬ LÝ LOGIC (HANDLERS)
+// ==========================================
+
+// Xử lý chọn đồng hành
+export async function handleEquipPet(interaction, petIndex) {
+    const userId = interaction.user.id;
+    const userData = Database.getUser(userId);
+    
+    // Cập nhật Active Index
+    userData.activePetIndex = parseInt(petIndex);
+    Database.updateUser(userId, userData);
+
+    const pName = userData.pets[petIndex].name;
+    
+    // Cập nhật UI trước
+    await showPetDetails(interaction, petIndex);
+
+    // Gửi thông báo
+    await interaction.followUp({ 
+        content: `✅ Đã chọn **${pName}** làm bạn đồng hành chiến đấu!`, 
+        flags: [MessageFlags.Ephemeral] 
     });
 }
 
-// ==========================================
-// 4. LOGIC XỬ LÝ HÀNH ĐỘNG
-// ==========================================
-
-// Hàm xử lý cho ăn (XP)
+// Xử lý cho ăn
 export async function handleFeed(interaction, petIndex, candyType) {
     const userId = interaction.user.id;
     const userData = Database.getUser(userId);
-    const petData = userData.pets[petIndex];
-    const pet = new Pet(petData);
-    let successMessage = "";
+    const pData = userData.pets[petIndex];
+    const p = new Pet(pData);
     
-    const candyConfig = CANDY_CONFIG[candyType];
-    
-    if (userData.inventory.candies[candyType] <= 0) {
-        successMessage = `🚫 Bạn không còn ${candyConfig.name}.`;
-    } else if (pet.level >= MAX_PET_LEVEL) {
-         successMessage = `🚫 ${pet.name} đã đạt cấp độ tối đa!`;
-    } else {
-        // TRỪ ITEM VÀ THỰC HIỆN NÂNG CẤP
-        userData.inventory.candies[candyType]--;
-        
-        const leveledUp = pet.addExp(candyConfig.exp, POINTS_PER_LEVEL);
-        
-        userData.pets[petIndex] = pet.getDataForSave(); 
-        Database.updateUser(userId, userData);
+    const candyKey = candyType.toUpperCase();
+    const candyCfg = CANDIES[candyKey];
 
-        successMessage = `✅ Đã cho ${pet.icon} **${pet.name}** ăn ${candyConfig.name}.\nĐạt được **+${candyConfig.exp} XP**.`;
-        if (leveledUp) {
-            successMessage += `\n🎉 **${pet.name}** đã lên cấp **Lv.${pet.level}!** (Nhận ${POINTS_PER_LEVEL} điểm)`;
-        }
+    if (!userData.inventory.candies[candyType]) {
+         return interaction.followUp({ content: `🚫 Hết ${candyCfg?.name || 'kẹo'}!`, flags: [MessageFlags.Ephemeral] });
     }
 
-    await interaction.followUp({ content: successMessage, ephemeral: true });
-    // Quay lại menu Pet Info sau khi cho ăn
-    await showPetDetails(interaction, petIndex); 
+    userData.inventory.candies[candyType]--;
+    
+    const leveledUp = p.addExp(candyCfg.xp, POINTS_PER_LEVEL);
+    
+    userData.pets[petIndex] = p.getDataForSave();
+    Database.updateUser(userId, userData);
+
+    let msg = `✅ **${p.name}** đã ăn ${candyCfg.name} (+${candyCfg.xp} XP)!`;
+    if (leveledUp) msg += `\n🆙 **LÊN CẤP!** Hiện tại Lv.${p.level}`;
+
+    await interaction.followUp({ content: msg, flags: [MessageFlags.Ephemeral] });
+    await showFeedMenu(interaction, petIndex); 
 }
 
-// Hàm xử lý nâng cấp chỉ số
+// Xử lý nâng stats
 export async function handleStatUpgrade(interaction, petIndex, statKey) {
     const userId = interaction.user.id;
     const userData = Database.getUser(userId);
-    const petData = userData.pets[petIndex];
-    const pet = new Pet(petData);
-    
-    if ((pet.statPoints || 0) <= 0) {
-        return interaction.reply({ content: `🚫 ${pet.name} không có điểm nâng cấp.`, ephemeral: true });
-    }
-    
-    // THỰC HIỆN NÂNG CẤP
-    pet.incrementStat(statKey); 
-    pet.statPoints -= 1;
-    
-    // Cập nhật Pet Data
-    userData.pets[petIndex] = pet.getDataForSave(); 
-    Database.updateUser(userId, userData);
+    const p = new Pet(userData.pets[petIndex]);
 
-    await interaction.reply({ content: `✅ Đã nâng **+1 ${statKey.toUpperCase()}** cho ${pet.name}.`, ephemeral: true });
-    // Quay lại menu nâng cấp chỉ số để tiếp tục dùng điểm
-    await showStatUpgradeMenu(interaction, petIndex); 
+    if (p.statPoints > 0) {
+        p.incrementStat(statKey);
+        
+        userData.pets[petIndex] = p.getDataForSave();
+        Database.updateUser(userId, userData);
+        
+        await interaction.followUp({ content: `✅ Đã tăng ${statKey.toUpperCase()}!`, flags: [MessageFlags.Ephemeral] });
+        await showStatUpgradeMenu(interaction, petIndex);
+    } else {
+        await interaction.followUp({ content: "🚫 Không đủ điểm tiềm năng!", flags: [MessageFlags.Ephemeral] });
+    }
 }
 
-// Hàm xử lý học skill (Sử dụng Select Menu cho cả Book và Slot)
-export async function handleSkillLearn(interaction, petIndex, bookKey, slotIndex) {
-    const userId = interaction.user.id;
-    const userData = Database.getUser(userId);
-    const petData = userData.pets[petIndex];
-    const pet = new Pet(petData);
-    
-    const bookConfig = SKILLBOOK_CONFIG[bookKey];
-    const skillId = bookConfig.skillId;
-    const invSkillBooks = userData.inventory.skillbooks || {};
+// ==========================================
+// 5. ROUTER: XỬ LÝ TẤT CẢ NÚT BẤM TÚI ĐỒ
+// ==========================================
 
-    let successMessage = "";
-    
-    // Kiểm tra Rank
-    const petRarityRank = RARITY_CONFIG[pet.rarity].rank; 
-    const bookRarityRank = RARITY_CONFIG[bookConfig.rarity].rank;
-    
-    if (invSkillBooks[bookKey] <= 0) {
-        successMessage = `🚫 Bạn không có ${bookConfig.name}.`;
-    } else if (pet.skills.includes(skillId) && slotIndex < pet.skills.length) {
-        successMessage = `🚫 ${pet.name} đã học skill này ở slot khác.`;
-    } else if (slotIndex >= 4) { 
-        successMessage = `🚫 Vị trí skill không hợp lệ (Max 4 slots).`;
-    } else if (petRarityRank < bookRarityRank) {
-        successMessage = `🚫 Rank Pet (${pet.rarity}) quá thấp để học sách ${bookConfig.rarity}.`;
-    } else {
-        // THỰC HIỆN HỌC SKILL
-        userData.inventory.skillbooks[bookKey]--;
-        pet.learnSkill(skillId, slotIndex); // Giả định Pet.learnSkill(id, index)
-        
-        userData.pets[petIndex] = pet.getDataForSave(); 
-        Database.updateUser(userId, userData);
+export async function handleInventoryInteraction(interaction) {
+    const { customId } = interaction;
 
-        const slotName = slotIndex < pet.skills.length ? `Slot ${slotIndex + 1} (Thay thế)` : `Slot ${slotIndex + 1} (Mới)`;
-        successMessage = `✅ **${pet.name}** đã học thành công Skill: **${bookConfig.name}** vào ${slotName}!`;
+    // 1. Điều hướng trang / Làm mới / Quay lại
+    if (customId === 'inv_refresh') {
+        await showInventory(interaction, 0);
+    } 
+    else if (customId.startsWith('inv_prev_') || customId.startsWith('inv_next_') || customId.startsWith('inv_to_main_')) {
+        const page = parseInt(customId.split('_').pop());
+        await showInventory(interaction, page);
+    }
+    
+    // 2. Xem chi tiết Pet (Từ danh sách bấm vào)
+    else if (customId.startsWith('inv_show_details_')) {
+        const index = parseInt(customId.split('_').pop());
+        await showPetDetails(interaction, index);
     }
 
-    await interaction.followUp({ content: successMessage, ephemeral: true });
-    // Quay lại menu học skill
-    await showSkillLearnMenu(interaction, petIndex); 
+    // 3. Chọn Đồng Hành (Equip)
+    else if (customId.startsWith('inv_equip_')) {
+        const index = parseInt(customId.split('_').pop());
+        await handleEquipPet(interaction, index);
+    }
+
+    // 4. Các menu phụ (Cho ăn, Stats, Skill...)
+    else if (customId.startsWith('inv_menu_feed_')) {
+        const index = parseInt(customId.split('_').pop());
+        await showFeedMenu(interaction, index);
+    }
+    else if (customId.startsWith('inv_menu_stats_')) {
+        const index = parseInt(customId.split('_').pop());
+        await showStatUpgradeMenu(interaction, index);
+    }
+    else if (customId.startsWith('inv_menu_learn_')) {
+        const index = parseInt(customId.split('_').pop());
+        await showSkillLearnMenu(interaction, index);
+    }
+
+    // 5. Xử lý hành động cụ thể (Ăn kẹo, Cộng điểm)
+    else if (customId.startsWith('inv_feed_')) {
+        // Format: inv_feed_type_index
+        const parts = customId.split('_');
+        const index = parseInt(parts.pop());
+        const type = parts[2]; // normal, high, super
+        await handleFeed(interaction, index, type);
+    }
+    else if (customId.startsWith('inv_upgrade_stat_')) {
+        // Format: inv_upgrade_stat_key_index
+        const parts = customId.split('_');
+        const index = parseInt(parts.pop());
+        const key = parts[3]; // hp, atk, def...
+        await handleStatUpgrade(interaction, index, key);
+    }
 }

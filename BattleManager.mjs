@@ -3,16 +3,14 @@ import {
     ActionRowBuilder, 
     ButtonBuilder, 
     ButtonStyle, 
-    MessageFlags, 
-    StringSelectMenuBuilder, 
-    StringSelectMenuOptionBuilder 
+    MessageFlags 
 } from 'discord.js';
 
 import { activeWildPets } from './SpawnSystem.mjs'; 
 import { Database } from './Database.mjs';
 import { Pet, calculateDamage, processSkillEffect, createDungeonBoss } from './GameLogic.mjs'; 
 import { getSkillById } from './SkillList.mjs'; 
-import { ELEMENT_ICONS } from './Constants.mjs';
+import { ELEMENT_ICONS, RARITY_COLORS } from './Constants.mjs';
 
 const PET_XP_BASE = 100;
 const DEATH_COOLDOWN = 10 * 60 * 1000; // 10 Phút
@@ -39,7 +37,6 @@ function calculateCatchRate(playerPet, wildPet) {
     return Math.max(0.005, Math.min(1.0, finalRate));
 }
 
-// Thanh trạng thái dạng khối (Block)
 function createStatusBar(current, max, color = 'HP') {
     const totalBars = 8; 
     const safeMax = max > 0 ? max : 1;
@@ -56,10 +53,6 @@ function createStatusBar(current, max, color = 'HP') {
     return `${filled}${empty} | ${Math.round(current)}`;
 }
 
-function createHealthBar(current, max) {
-    return createStatusBar(current, max, 'HP');
-}
-
 function getEmojiUrl(emojiStr) {
     if (!emojiStr) return null;
     const match = emojiStr.match(/<?(a)?:?(\w{2,32}):(\d{17,19})>?/);
@@ -71,7 +64,6 @@ function getEmojiUrl(emojiStr) {
     return null; 
 }
 
-// Check trạng thái chết
 function checkPetStatus(petData) {
     if (!petData.deathTime) return { isDead: false };
     const now = Date.now();
@@ -108,27 +100,11 @@ export async function startAdventure(interaction, difficulty) {
     const userData = Database.getUser(userId);
     if (!userData.pets.length) return interaction.reply({ content: "🚫 Cần có Pet!", flags: [MessageFlags.Ephemeral] });
     
-    // --- LOGIC CHỌN PET ---
-    if (userData.pets.length > 1) {
-        const selectMenu = new StringSelectMenuBuilder()
-            .setCustomId(`select_pet_adventure_${difficulty}`)
-            .setPlaceholder('👇 Chọn Pet xuất chiến')
-            .addOptions(
-                userData.pets.slice(0, 25).map((pet, index) => 
-                    new StringSelectMenuOptionBuilder()
-                        .setLabel(`${pet.name} (Lv.${pet.level})`)
-                        .setDescription(`Hệ: ${pet.element} | HP: ${Math.round(pet.currentHP)}`)
-                        .setValue(index.toString())
-                        .setEmoji(pet.deathTime ? '💀' : '🐾')
-                )
-            );
+    // 💡 LẤY PET ĐỒNG HÀNH
+    const petIndex = userData.activePetIndex !== undefined ? userData.activePetIndex : 0;
 
-        const row = new ActionRowBuilder().addComponents(selectMenu);
-        return interaction.reply({ content: "⚔️ **Chọn Pet để vào Hầm Ngục:**", components: [row], flags: [MessageFlags.Ephemeral] });
-    }
-
-    // Nếu chỉ có 1 pet
-    await startBattleLogic(interaction, userId, userData, 0, 'adventure', difficulty);
+    // VÀO TRẬN LUÔN
+    await startBattleLogic(interaction, userId, userData, petIndex, 'adventure', difficulty);
 }
 
 export async function createPvPChallenge(interaction, opponent) {
@@ -142,43 +118,59 @@ export async function createPvPChallenge(interaction, opponent) {
     await interaction.reply({ content: `<@${opponent.id}>`, embeds: [embed], components: [row] });
 }
 
-// Hàm tách biệt để khởi tạo battle (Dùng cho cả Auto và Select)
+// Hàm khởi tạo trận đấu (Chung cho Adventure & Wild)
 async function startBattleLogic(interaction, userId, userData, petIndex, type, param) {
+    // 1. Defer an toàn (chỉ defer nếu chưa defer)
+    try {
+        if (!interaction.deferred && !interaction.replied) {
+            await interaction.deferReply(); 
+        }
+    } catch (e) { console.log("Ack error:", e.message); }
+
+    // 2. Kiểm tra Pet Đồng Hành hợp lệ
+    if (!userData.pets[petIndex]) {
+        petIndex = 0;
+        if (!userData.pets[0]) return interaction.editReply({ content: "🚫 Bạn không còn Pet nào để chiến đấu!" });
+        userData.activePetIndex = 0; 
+        Database.updateUser(userId, userData);
+    }
+    
     const petData = userData.pets[petIndex];
 
-    // Check chết
+    // 3. Check Chết
     const petCheck = checkPetStatus(petData);
     if (petCheck.isDead) {
-        const msg = { content: `💀 **${petData.name} đang trọng thương!**\nCần nghỉ ngơi thêm **${petCheck.remaining} phút**.`, flags: [MessageFlags.Ephemeral] };
-        if (interaction.isStringSelectMenu && interaction.isStringSelectMenu()) return interaction.update({ ...msg, components: [] }); 
-        else return interaction.reply(msg);
+        return interaction.editReply({ 
+            content: `💀 **${petData.name}** (Đồng hành) đang trọng thương!\nCần nghỉ ngơi thêm **${petCheck.remaining} phút**.\n*Hãy vào \`/inventory\` để hồi phục hoặc chọn Pet khác.*`, 
+            components: [] 
+        });
     }
     if (petCheck.revived) Database.updateUser(userId, userData);
 
-    // Xác định đối thủ
+    // 4. Xác định đối thủ
     let wildPetInstance;
+    let wildPetId = null;
+
     if (type === 'adventure') {
         wildPetInstance = createDungeonBoss(param); 
     } else if (type === 'wild') {
-        wildPetInstance = param; 
+        wildPetInstance = param.petData; 
+        wildPetId = param.petId; 
     }
 
+    // 5. Tạo Session Battle
     activeBattles.set(userId, {
         mode: 'pve', type: type, difficulty: type === 'adventure' ? param : 1,
         playerPet: new Pet(petData), 
         wildPet: wildPetInstance, 
+        wildPetId: wildPetId, 
         turn: 1, logs: ["⚔️ **Trận đấu bắt đầu!**"]
     });
 
-    // Xử lý Defer/Reply để tránh lỗi 10062
-    if (interaction.isStringSelectMenu && interaction.isStringSelectMenu()) {
-        await interaction.update({ content: "Đang vào trận...", components: [] });
-        activeBattles.get(userId).messageId = interaction.message.id;
-    } else {
-        if (!interaction.deferred && !interaction.replied) await interaction.deferReply();
-        const initialReply = await interaction.editReply({ content: "Đang vào trận...", withResponse: true });
-        activeBattles.get(userId).messageId = initialReply.id;
-    }
+    // 6. Chuyển cảnh sang giao diện chiến đấu
+    const msg = await interaction.editReply({ content: "🔥 Đang vào trận...", components: [] });
+    const battle = activeBattles.get(userId);
+    if (battle) battle.messageId = msg.id;
 
     await showPvEInterface(interaction, userId);
 }
@@ -187,30 +179,33 @@ export async function handleInteraction(interaction) {
     const { customId, user, client } = interaction;
     const uid = user.id;
 
-    // XỬ LÝ CHỌN PET (Adventure)
-    if (interaction.isStringSelectMenu() && customId.startsWith('select_pet_adventure_')) {
-        const difficulty = parseInt(customId.split('_').pop());
-        const selectedIndex = parseInt(interaction.values[0]);
-        const userData = Database.getUser(uid);
-        await startBattleLogic(interaction, uid, userData, selectedIndex, 'adventure', difficulty);
-        return;
-    }
-
-    // XỬ LÝ CHỌN PET (Wild)
-    if (interaction.isStringSelectMenu() && customId.startsWith('select_pet_wild_')) {
-        const petId = customId.replace('select_pet_wild_', '');
+    // 1. XỬ LÝ NÚT "KHIÊU CHIẾN" (WILD PET)
+    if (customId.startsWith('challenge_')) {
+        const petId = customId.replace('challenge_', '');
         const info = activeWildPets.get(petId);
-        if (!info) return interaction.update({ content: "⚠️ Pet đã biến mất!", components: [] });
         
-        const selectedIndex = parseInt(interaction.values[0]);
+        // Defer ngay lập tức để tránh timeout
+        if (!interaction.deferred && !interaction.replied) await interaction.deferReply();
+
+        if (!info) return interaction.editReply({ content: "⚠️ Pet này không tồn tại hoặc đã biến mất!" });
+        if (info.isBattling) return interaction.editReply({ content: "⚠️ Pet này đang bị người khác đánh!" });
+
         const userData = Database.getUser(uid);
+        if (!userData.pets.length) return interaction.editReply({ content: "🚫 Bạn cần có Pet để chiến đấu!" });
+
+        // 💡 TỰ ĐỘNG LẤY PET ĐỒNG HÀNH
+        const petIndex = userData.activePetIndex !== undefined ? userData.activePetIndex : 0;
+
+        // Đánh dấu Pet Wild đang bận
+        info.isBattling = true; 
+        activeWildPets.set(petId, info);
         
-        info.isBattling = true; activeWildPets.set(petId, info);
-        await startBattleLogic(interaction, uid, userData, selectedIndex, 'wild', info.petData);
+        // Bắt đầu chiến đấu ngay
+        await startBattleLogic(interaction, uid, userData, petIndex, 'wild', { petData: info.petData, petId: petId });
         return;
     }
 
-    // PVP ROUTING
+    // 2. PVP ROUTING
     if (customId.startsWith('pvp_')) {
         const battle = activeBattles.get(uid);
         if (!interaction.deferred && !interaction.replied && customId !== 'pvp_accept_') await interaction.deferUpdate(); 
@@ -227,53 +222,18 @@ export async function handleInteraction(interaction) {
         return;
     }
 
-    // PVE ROUTING
+    // 3. LOGIC TRONG TRẬN ĐẤU (PVE)
     const battle = activeBattles.get(uid);
     
-    if (customId.startsWith('challenge_')) {
-        const petId = customId.replace('challenge_', '');
-        const info = activeWildPets.get(petId);
-        if (!info) return interaction.reply({ content: "⚠️ Pet này không tồn tại!", flags: [MessageFlags.Ephemeral] });
-        if (info.isBattling) return interaction.reply({ content: "⚠️ Pet này đang bị người khác đánh!", flags: [MessageFlags.Ephemeral] });
-
-        const userData = Database.getUser(uid);
-        if (!userData.pets.length) return interaction.reply({ content: "🚫 Cần Pet!", flags: [MessageFlags.Ephemeral] });
-
-        // --- LOGIC CHỌN PET CHO WILD ---
-        if (userData.pets.length > 1) {
-            const selectMenu = new StringSelectMenuBuilder()
-                .setCustomId(`select_pet_wild_${petId}`)
-                .setPlaceholder('👇 Chọn Pet bắt thú')
-                .addOptions(
-                    userData.pets.slice(0, 25).map((pet, index) => 
-                        new StringSelectMenuOptionBuilder()
-                            .setLabel(`${pet.name} (Lv.${pet.level})`)
-                            .setDescription(`Hệ: ${pet.element} | HP: ${Math.round(pet.currentHP)}`)
-                            .setValue(index.toString())
-                            .setEmoji(pet.deathTime ? '💀' : '🐾')
-                    )
-                );
-            const row = new ActionRowBuilder().addComponents(selectMenu);
-            return interaction.reply({ content: "⚔️ **Chọn Pet để chiến đấu:**", components: [row], flags: [MessageFlags.Ephemeral] });
-        }
-
-        // 1 Pet thì vào luôn
-        const petCheck = checkPetStatus(userData.pets[0]);
-        if (petCheck.isDead) return interaction.reply({ content: `💀 **Pet đang trọng thương!** (${petCheck.remaining}p)`, flags: [MessageFlags.Ephemeral] });
-        if (petCheck.revived) Database.updateUser(uid, userData);
-
-        info.isBattling = true; activeWildPets.set(petId, info);
-        await startBattleLogic(interaction, uid, userData, 0, 'wild', info.petData);
-        return;
-    }
-
+    // Defer cho các nút skill/hành động trong trận
     if (!interaction.deferred && !interaction.replied) await interaction.deferUpdate();
 
-    if (!battle && !['btn_kill', 'btn_catch', 'btn_claim', 'btn_defeat'].includes(customId)) {
-         return interaction.editReply({ content: "Hết phiên chiến đấu.", embeds: [], components: [] });
+    if (!battle && !['btn_claim', 'btn_defeat'].includes(customId)) {
+          return interaction.editReply({ content: "Hết phiên chiến đấu.", embeds: [], components: [] });
     }
     else if (customId.startsWith('use_skill_')) await processPvETurn(interaction, parseInt(customId.split('_').pop()), battle);
-    else if (['btn_kill', 'btn_catch', 'btn_claim', 'btn_defeat'].includes(customId)) await handlePvEEndActions(interaction, customId, client);
+    else if (['btn_claim', 'btn_defeat'].includes(customId)) await handlePvEEndActions(interaction, customId, client); 
+    else if (customId === 'btn_catch') await handleCatchAction(interaction, battle); 
     else if (customId === 'btn_run') await handleRunAction(interaction, battle);
     else if (customId === 'btn_heal') await handleHealAction(interaction, battle);
     else if (customId === 'btn_mana') await handleManaAction(interaction, battle);
@@ -313,7 +273,6 @@ async function showPvEInterface(interaction, uid) {
     const wildImg = getEmojiUrl(wildPet.icon);
     const playerImg = getEmojiUrl(playerPet.icon); 
 
-    // Sắp xếp ảnh: Địch Thumbnail (Góc), Ta Image (Dưới)
     if (wildImg) embed.setThumbnail(wildImg);
     if (playerImg) embed.setImage(playerImg);
 
@@ -322,7 +281,6 @@ async function showPvEInterface(interaction, uid) {
     skills.forEach((sid, idx) => {
         const s = getSkillById(sid);
         const canUse = s && playerPet.currentMP >= s.manaCost;
-        // MÔ TẢ SKILL CHI TIẾT
         const btnLabel = s ? `${s.name} | ⚔️${s.power} 💧${s.manaCost}`.slice(0, 80) : 'Skill';
         row1.addComponents(new ButtonBuilder().setCustomId(`use_skill_${idx}`).setLabel(btnLabel).setStyle(ButtonStyle.Primary).setDisabled(!canUse));
     });
@@ -332,6 +290,17 @@ async function showPvEInterface(interaction, uid) {
         new ButtonBuilder().setCustomId('btn_mana').setLabel('💧 Hồi Mana').setStyle(ButtonStyle.Primary),
         new ButtonBuilder().setCustomId('btn_run').setLabel('🏃 Bỏ Chạy').setStyle(ButtonStyle.Danger)
     );
+
+    if (battle.type === 'wild') {
+        const catchRate = calculateCatchRate(playerPet, wildPet);
+        const catchBtn = new ButtonBuilder()
+            .setCustomId('btn_catch')
+            .setLabel(`⭐ Bắt (${Math.round(catchRate * 100)}%)`) 
+            .setStyle(ButtonStyle.Success)
+            .setDisabled(wildPet.currentHP <= 0); 
+            
+        row2.addComponents(catchBtn);
+    }
 
     const payload = { embeds: [embed], components: [row1, row2] };
     
@@ -355,8 +324,8 @@ async function processPvETurn(interaction, skillIndex, battle) {
     if (playerPet.currentHP <= 0) return handlePvEEndActions(interaction, 'btn_defeat', interaction.client);
 
     if (playerPet.currentMP < pSkill.manaCost) {
-         battle.logs.push(`⚠️ Thiếu MP!`);
-         return showPvEInterface(interaction, interaction.user.id);
+          battle.logs.push(`⚠️ Thiếu MP!`);
+          return showPvEInterface(interaction, interaction.user.id);
     }
     playerPet.currentMP -= pSkill.manaCost;
 
@@ -429,8 +398,11 @@ async function processEnemyTurn(interaction, battle) {
         battle.logs.push(`💤 Địch nghỉ ngơi.`);
     }
 
+    // 💡 LƯU TRẠNG THÁI VÀO ĐÚNG SLOT PET
     const userData = Database.getUser(interaction.user.id);
+    // Tìm pet đang chiến đấu trong kho của user
     const pIdx = userData.pets.findIndex(p => p.id === playerPet.id);
+    
     if(pIdx !== -1) {
         userData.pets[pIdx].currentHP = playerPet.currentHP;
         userData.pets[pIdx].currentMP = playerPet.currentMP;
@@ -482,7 +454,7 @@ async function handleManaAction(interaction, battle) {
 }
 
 async function handleRunAction(interaction, battle) {
-    const petToClearId = battle.wildPet.id; 
+    const petToClearId = battle.wildPetId; 
     if (battle.type === 'adventure') {
         battle.logs.push("🚫 Không thể chạy!");
         return showPvEInterface(interaction, interaction.user.id);
@@ -490,10 +462,19 @@ async function handleRunAction(interaction, battle) {
     const rate = 0.5 + (battle.playerPet.getStats().SPD / battle.wildPet.getStats().SPD) * 0.2;
     if (Math.random() < rate) {
         activeBattles.delete(interaction.user.id);
-        if (activeWildPets.has(petToClearId)) activeWildPets.delete(petToClearId);
+        
+        if (petToClearId) {
+            removePetFromWorld(petToClearId, interaction.client);
+        }
+
         return interaction.editReply({ content: "🏃 **Chạy thành công!**", embeds: [], components: [] });
     }
     battle.logs = ["❌ **Chạy thất bại!**"];
+    
+    if (petToClearId) {
+         const info = activeWildPets.get(petToClearId);
+         if(info) { info.isBattling = false; activeWildPets.set(petToClearId, info); }
+    }
     
     const wRes = calculateDamage(battle.wildPet, battle.playerPet, 'S1', {buff: []});
     battle.playerPet.currentHP = Math.max(0, battle.playerPet.currentHP - wRes.damage);
@@ -503,8 +484,60 @@ async function handleRunAction(interaction, battle) {
     await showPvEInterface(interaction, interaction.user.id);
 }
 
+// Xử lý nút bắt trong trận đấu
+async function handleCatchAction(interaction, battle) {
+    const userId = interaction.user.id;
+    const { playerPet, wildPet, wildPetId } = battle;
+
+    if (battle.type !== 'wild') {
+        battle.logs.push("🚫 Không thể bắt pet này.");
+        return showPvEInterface(interaction, userId);
+    }
+
+    const userData = Database.getUser(userId);
+    if (!userData.pets) userData.pets = [];
+    if (userData.pets.length >= 10) {
+        battle.logs.push("🚫 Kho Pet đã đầy (Tối đa 10).");
+        await processEnemyTurn(interaction, battle);
+        return;
+    }
+
+    const catchRate = calculateCatchRate(playerPet, wildPet);
+
+    if (Math.random() < catchRate) {
+        // 🚨 Bắt Thành Công
+        wildPet.ownerId = userId;
+        const wildPetStats = wildPet.getStats ? wildPet.getStats() : wildPet.baseStats;
+        wildPet.currentHP = wildPetStats.HP; // Hồi phục Pet
+        wildPet.currentMP = wildPetStats.MP;
+        
+        const petToSave = wildPet.getDataForSave ? wildPet.getDataForSave() : wildPet;
+        Database.addPetToUser(userId, petToSave);
+        
+        battle.logs = [`🎉 **BẮT THÀNH CÔNG!** (${Math.round(catchRate * 100)}%) ${wildPet.name} đã được thêm vào kho. Trận đấu kết thúc.`];
+        
+        // Dọn dẹp trạng thái và tin nhắn
+        activeBattles.delete(userId);
+        if (wildPetId) removePetFromWorld(wildPetId, interaction.client);
+        
+        await interaction.editReply({ 
+            content: battle.logs.join('\n'), 
+            embeds: [], 
+            components: [] 
+        });
+
+    } else {
+        // ❌ Bắt Thất Bại
+        battle.logs = [`💢 **BẮT TRƯỢT!** (${Math.round(catchRate * 100)}%)`];
+        
+        // Bị Địch đánh trả 1 lượt
+        await processEnemyTurn(interaction, battle);
+    }
+}
+
+
 async function showPvEVictory(interaction, battle) {
-    const { playerPet, wildPet, type } = battle;
+    const { playerPet, wildPet, type, wildPetId } = battle;
     const userId = interaction.user.id;
     const totalXP = Math.round((wildPet.level * PET_XP_BASE + wildPet.getStats().HP / 10) * (type === 'adventure' ? 1.5 : 1));
     
@@ -514,7 +547,8 @@ async function showPvEVictory(interaction, battle) {
     
     if(pIdx !== -1) {
         const pInstance = new Pet(userData.pets[pIdx]);
-        if (pInstance.addXp(totalXP)) lvMsg = `\n🆙 **LÊN CẤP ${pInstance.level}!**`;
+        // Dùng addExp thay vì addXp (theo GameLogic mới)
+        if (pInstance.addExp(totalXP)) lvMsg = `\n🆙 **LÊN CẤP ${pInstance.level}!**`;
         pInstance.currentHP = pInstance.getStats().HP;
         pInstance.currentMP = pInstance.getStats().MP;
         userData.pets[pIdx] = pInstance.getDataForSave();
@@ -524,47 +558,51 @@ async function showPvEVictory(interaction, battle) {
 
     const embed = new EmbedBuilder().setTitle("🏆 CHIẾN THẮNG (Pet đã hồi phục)").setColor(0x00FF00).setDescription(`Hạ gục **${wildPet.name}**!\nNhận: **${totalXP} XP** ${lvMsg}`);
     const row = new ActionRowBuilder();
+    
     if (type === 'wild') {
-        const catchRate = calculateCatchRate(playerPet, wildPet);
-        embed.setFooter({ text: `Tỷ lệ bắt: ${Math.round(catchRate * 100)}%` });
-        row.addComponents(
-            new ButtonBuilder().setCustomId('btn_catch').setLabel('Bắt').setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId('btn_kill').setLabel('Kết Liễu (+Kẹo/Thuốc)').setStyle(ButtonStyle.Danger)
-        );
-        setTimeout(() => removePetFromWorld(wildPet.id, interaction.client), 60000); 
+        // TỰ ĐỘNG THỰC HIỆN KẾT LIỄU VÀ TRAO THƯỞNG
+        userData.inventory.candies.normal = (userData.inventory.candies.normal || 0) + 2;
+        userData.inventory.potions = (userData.inventory.potions || 0) + 1; 
+        Database.updateUser(userId, userData);
+
+        embed.setDescription(embed.data.description + `\n\n🔪 Đã kết liễu tự động.\nNhận **2 🍬 Kẹo & 1 💊 Thuốc**.`);
+        
+        // Xóa Pet Wild ngay khi đã xác định kết thúc
+        if (wildPetId) removePetFromWorld(wildPetId, interaction.client);
+
+        row.addComponents(new ButtonBuilder().setCustomId('btn_claim').setLabel('Xong').setStyle(ButtonStyle.Primary));
+
     } else {
+        // Adventure
         row.addComponents(new ButtonBuilder().setCustomId('btn_claim').setLabel('Xong').setStyle(ButtonStyle.Primary));
     }
+    
     await interaction.editReply({ embeds: [embed], components: [row] });
 }
+
 
 async function handlePvEEndActions(interaction, customId, client) {
     const userId = interaction.user.id;
     const tempBattle = activeBattles.get(userId);
-    let targetPetId = null;
-    let wildPetData = null;
-    let playerPetData = null;
+    let targetPetId = tempBattle ? tempBattle.wildPetId : null;
+    let playerPetData = tempBattle ? tempBattle.playerPet : null;
 
-    // Lấy data từ Battle State (chuẩn nhất)
-    if (tempBattle) {
-        playerPetData = tempBattle.playerPet;
-    }
-
-    // Tìm pet ID tương ứng với trận đấu
-    for (const [pid, info] of activeWildPets.entries()) {
-        if (tempBattle && info.messageId === tempBattle.messageId) {
-             targetPetId = pid; wildPetData = info.petData; break;
-        }
-        if (info.messageId === interaction.message.id) { 
-            targetPetId = pid; wildPetData = info.petData; break; 
+    // Fallback tìm ID Pet từ tin nhắn nếu không có Battle State (dùng cho tin nhắn cũ/expired)
+    if (!targetPetId) {
+        for (const [pid, info] of activeWildPets.entries()) {
+            if (info.messageId === interaction.message.id) { 
+                targetPetId = pid; break;
+            }
         }
     }
 
     if (customId === 'btn_defeat') {
         activeBattles.delete(userId);
         if (targetPetId) {
-             const info = activeWildPets.get(targetPetId);
-             if(info) { info.isBattling = false; activeWildPets.set(targetPetId, info); }
+            const info = activeWildPets.get(targetPetId);
+            if(info) { 
+                info.isBattling = false; activeWildPets.set(targetPetId, info); 
+            }
         }
         // Death Cooldown
         const userData = Database.getUser(userId);
@@ -576,37 +614,14 @@ async function handlePvEEndActions(interaction, customId, client) {
         return interaction.editReply({ content: "💀 **THẤT BẠI!** Pet đã trọng thương (Nghỉ 10p).", embeds: [], components: [] });
     }
 
-    const wildInfo = activeWildPets.get(targetPetId);
-    if (!wildInfo && customId !== 'btn_claim') return interaction.followUp({ content: "⚠️ Pet không tồn tại.", flags: [MessageFlags.Ephemeral] });
-
-    if (customId === 'btn_catch') {
-        const catchRate = calculateCatchRate(playerPetData, wildPetData);
-        if (Math.random() < catchRate) { 
-            const userData = Database.getUser(userId);
-            if (userData.pets.length >= 10) return interaction.followUp({ content: "🚫 Kho đầy!", flags: [MessageFlags.Ephemeral] });
-            
-            wildPetData.ownerId = userId;
-            const wildPetStats = wildPetData.getStats ? wildPetData.getStats() : wildPetData.baseStats;
-            wildPetData.currentHP = wildPetStats.HP;
-            wildPetData.currentMP = wildPetStats.MP;
-            
-            const petToSave = wildPetData.getDataForSave ? wildPetData.getDataForSave() : wildPetData;
-            Database.addPetToUser(userId, petToSave);
-            await interaction.editReply({ content: `🎉 **BẮT THÀNH CÔNG!** Tỷ lệ: ${Math.round(catchRate * 100)}%. Pet đã được hồi phục.`, embeds: [], components: [] });
-        } else { 
-            await interaction.editReply({ content: `💢 **BẮT TRƯỢT!** Tỷ lệ: ${Math.round(catchRate * 100)}%`, embeds: [], components: [] });
-        }
-    } else if (customId === 'btn_kill') {
-        const userData = Database.getUser(userId);
-        userData.inventory.candies.normal = (userData.inventory.candies.normal || 0) + 2;
-        userData.inventory.potions = (userData.inventory.potions || 0) + 1; 
-        Database.updateUser(userId, userData);
-        await interaction.editReply({ content: `🔪 Đã kết liễu. Nhận **2 🍬 Kẹo & 1 💊 Thuốc**.`, embeds: [], components: [] });
-    } else {
+    if (customId === 'btn_claim') {
         await interaction.editReply({ content: "✅ Xong.", embeds: [], components: [] });
+    } 
+
+    // Xóa Pet Wild KHỎI THẾ GIỚI chỉ khi CLAIM thành công
+    if (targetPetId && customId === 'btn_claim') {
+        removePetFromWorld(targetPetId, client); 
     }
-    
-    if (targetPetId) removePetFromWorld(targetPetId, client);
 }
 
 // ==================================================================
@@ -616,8 +631,24 @@ async function handlePvEEndActions(interaction, customId, client) {
 async function startPvPMatch(interaction, cid) {
     const { challenger, opponent } = pendingChallenges.get(cid);
     pendingChallenges.delete(cid);
-    const p1 = new Pet(Database.getUser(challenger.id).pets[0]);
-    const p2 = new Pet(Database.getUser(opponent.id).pets[0]);
+    
+    // 💡 SỬA ĐỔI: Lấy Pet theo activePetIndex thay vì pets[0]
+    const u1 = Database.getUser(challenger.id);
+    const u2 = Database.getUser(opponent.id);
+    
+    const p1Index = u1.activePetIndex !== undefined ? u1.activePetIndex : 0;
+    const p2Index = u2.activePetIndex !== undefined ? u2.activePetIndex : 0;
+
+    const p1Data = u1.pets[p1Index] || u1.pets[0];
+    const p2Data = u2.pets[p2Index] || u2.pets[0];
+
+    if (!p1Data || !p2Data) {
+        return interaction.editReply({ content: "❌ Một trong hai người chơi không có Pet hoặc lỗi dữ liệu!" });
+    }
+
+    const p1 = new Pet(p1Data);
+    const p2 = new Pet(p2Data);
+
     const state = {
         mode: 'pvp', p1: { user: challenger, pet: p1, id: challenger.id }, p2: { user: opponent, pet: p2, id: opponent.id },
         turnOwner: (p1.getStats().SPD >= p2.getStats().SPD) ? challenger.id : opponent.id,
@@ -678,7 +709,7 @@ async function processPvPTurn(interaction, idx, battle) {
         return interaction.update({ content: `🏆 **${atk.user.username}** thắng!`, embeds: [], components: [] });
     }
     battle.turnOwner = def.id;
-    await updatePvPInterface(interaction, battle);
+    await updatePvPInterface(interaction, battle);  
 }
 
 async function endPvP(interaction, battle, winner) {
