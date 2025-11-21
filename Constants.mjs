@@ -94,7 +94,26 @@ export const CANDIES = {
     HIGH:   { name: 'Kẹo Cao Cấp', xp: 1000, emoji: EMOJIS.CANDY_HIGH },
     SUPER:  { name: 'Kẹo Siêu Cấp', xp: 2000, emoji: EMOJIS.CANDY_SUPER }
 };
+// Constants.mjs (UPDATED V2)
 
+// ... (Giữ nguyên các phần EMOJIS, RARITY, ELEMENTS cũ) ...
+
+// === THÊM MỚI: HỆ THỐNG NỘI TẠI (PASSIVES) ===
+export const PASSIVES = {
+    'VAMPIRISM': { id: 'VAMPIRISM', name: '🩸 Huyết Tộc', desc: 'Hồi 10% HP dựa trên sát thương gây ra.', trigger: 'onAttack' },
+    'BERSEKER':  { id: 'BERSEKER',  name: '😡 Cuồng Nộ',  desc: 'Khi HP dưới 30%, tăng 50% Sát thương.', trigger: 'onCalcDamage' },
+    'REGEN':     { id: 'REGEN',     name: '🌿 Tái Tạo',   desc: 'Hồi 5% HP tối đa mỗi lượt.', trigger: 'onTurnEnd' },
+    'THORNS':    { id: 'THORNS',    name: '🌵 Giáp Gai',  desc: 'Phản lại 10% sát thương nhận vào.', trigger: 'onDefend' },
+    'EVASION':   { id: 'EVASION',   name: '👻 Bóng Ma',   desc: 'Có 10% cơ hội né hoàn toàn đòn đánh.', trigger: 'onReceiveDamage' },
+    'CRIT_MASTER':{ id: 'CRIT_MASTER',name: '🎯 Bách Phát',desc: 'Tăng 20% tỷ lệ chí mạng.', trigger: 'onCritCheck' }
+};
+
+// === THÊM MỚI: CẤU HÌNH TIẾN HÓA ===
+export const EVOLUTION_CHAINS = {
+    'Pika-Chu': { target: 'Raichu-God', level: 20, material: 'Thunder Stone' },
+    'Slime':    { target: 'King Slime', level: 15, material: null },
+    'Dragonoid':{ target: 'Bahamut',    level: 30, material: 'Dragon Scale' }
+};
 // === 7. PET TEMPLATES (Đã thêm baseSPD và baseMP để tránh NaN) ===
 export const PET_TEMPLATES = [
     { name: "Pika-Chu", race: "Beast", baseHP: 1000, baseMP: 500, baseATK: 1050, baseSATK: 1100, baseDEF: 1000, baseSPD: 120 },

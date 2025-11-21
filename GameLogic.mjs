@@ -1,7 +1,7 @@
-// GameLogic.mjs
+// GameLogic.mjs (UPDATED V2)
 import { 
     PET_TEMPLATES, ELEMENTS, RARITY, 
-    RARITY_CONFIG, RARITY_WEIGHTS, EMOJIS, LEVEL_CONFIG, ELEMENT_ADVANTAGE 
+    RARITY_CONFIG, RARITY_WEIGHTS, EMOJIS, LEVEL_CONFIG, ELEMENT_ADVANTAGE, PASSIVES, EVOLUTION_CHAINS 
 } from './Constants.mjs';
 import { getRandomSkills, getSkillById } from './SkillList.mjs';
 
@@ -9,7 +9,7 @@ const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + mi
 const randomElement = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 // ==========================================
-// 1. CLASS PET
+// 1. CLASS PET (NÂNG CẤP)
 // ==========================================
 export class Pet {
     constructor(data) {
@@ -21,9 +21,7 @@ export class Pet {
         this.race = data.race || 'Unknown';
         this.rarity = data.rarity;
 
-        // [FIX] Đảm bảo Base Stats luôn đầy đủ số, tránh NaN
         const defaults = { HP: 1000, MP: 500, ATK: 1000, DEF: 1000, SPD: 100, SATK: 1000 };
-        // Merge defaults với data.baseStats
         this.baseStats = { ...defaults, ...data.baseStats };
         
         this.level = data.level || 1;
@@ -35,61 +33,44 @@ export class Pet {
 
         this.activeEffects = data.activeEffects || []; 
 
+        // --- NEW: PASSIVE ---
+        // Nếu data có passive thì lấy, không thì tìm trong Template, không có nữa thì random
+        if (data.passive) {
+            this.passive = data.passive;
+        } else {
+            const template = PET_TEMPLATES.find(t => t.name === this.name);
+            this.passive = template?.passive || randomElement(Object.keys(PASSIVES));
+        }
+
         this.currentStats = this.calculateStats();
-        
         const finalStats = this.calculateFinalStats(); 
         this.currentHP = data.currentHP !== undefined ? data.currentHP : finalStats.HP;
         this.currentMP = data.currentMP !== undefined ? data.currentMP : finalStats.MP;
     }
 
-    // --- HÀM TÍNH STATS (LOGIC PHÂN BỔ ĐIỂM) ---
+    // ... (Giữ nguyên calculateStats và calculateFinalStats từ code cũ) ...
     calculateStats() {
-        const rConfig = RARITY_CONFIG[this.rarity] || RARITY_CONFIG['Common'];
-        const multiplier = rConfig.statMultiplier; 
-        const genFactor = 0.8 + (this.gen / 100) * 0.4; 
-
-        // 1. Tính tổng điểm bonus từ Level (Mỗi level +25 điểm tổng vào Base)
-        const totalBonusPoints = (this.level - 1) * LEVEL_CONFIG.POINTS_PER_LEVEL;
-
-        // 2. Tính tổng Base Stats để chia tỷ lệ
-        const b = this.baseStats;
-        // Đảm bảo các giá trị b.* đều là số
-        const safeHP = b.HP || 1000;
-        const safeMP = b.MP || 500;
-        const safeATK = b.ATK || 1000;
-        const safeSATK = b.SATK || 1000;
-        const safeDEF = b.DEF || 1000;
-        const safeSPD = b.SPD || 100;
-
-        const totalBase = safeHP + safeMP + safeATK + safeSATK + safeDEF + safeSPD;
-
-        // 3. Hàm tính từng chỉ số
-        const calc = (baseVal) => {
-            if (!baseVal) baseVal = 100; // Fallback an toàn
-            // Tỷ lệ phân bổ = BaseStat / Tổng Base
-            const ratio = baseVal / totalBase;
-            // Điểm cộng thêm = Tổng điểm bonus * Tỷ lệ
-            const addedVal = totalBonusPoints * ratio;
-            
-            // Công thức: (Base + Điểm cộng thêm) * Rank * Gen
-            return Math.floor((baseVal + addedVal) * multiplier * genFactor);
-        };
-
-        return {
-            HP: calc(safeHP),
-            MP: calc(safeMP), // MP giờ cũng scale theo level/rank
-            ATK: calc(safeATK),
-            SATK: calc(safeSATK),
-            DEF: calc(safeDEF),
-            SPD: calc(safeSPD)
-        };
+       // (Copy code cũ vào đây để tiết kiệm chỗ hiển thị)
+       const rConfig = RARITY_CONFIG[this.rarity] || RARITY_CONFIG['Common'];
+       const multiplier = rConfig.statMultiplier; 
+       const genFactor = 0.8 + (this.gen / 100) * 0.4; 
+       const totalBonusPoints = (this.level - 1) * LEVEL_CONFIG.POINTS_PER_LEVEL;
+       const b = this.baseStats;
+       const safeHP = b.HP || 1000; const safeMP = b.MP || 500; const safeATK = b.ATK || 1000;
+       const safeSATK = b.SATK || 1000; const safeDEF = b.DEF || 1000; const safeSPD = b.SPD || 100;
+       const totalBase = safeHP + safeMP + safeATK + safeSATK + safeDEF + safeSPD;
+       const calc = (baseVal) => {
+           if (!baseVal) baseVal = 100;
+           const ratio = baseVal / totalBase;
+           const addedVal = totalBonusPoints * ratio;
+           return Math.floor((baseVal + addedVal) * multiplier * genFactor);
+       };
+       return { HP: calc(safeHP), MP: calc(safeMP), ATK: calc(safeATK), SATK: calc(safeSATK), DEF: calc(safeDEF), SPD: calc(safeSPD) };
     }
 
-    // --- HÀM TÍNH STATS CUỐI CÙNG (Áp dụng Buff/Debuff) ---
     calculateFinalStats() {
         const baseStats = this.calculateStats();
         let finalStats = { ...baseStats };
-
         this.activeEffects.forEach(effect => {
             if (effect.type === 'buff' || effect.type === 'debuff') {
                 const statKey = effect.stat;
@@ -98,22 +79,18 @@ export class Pet {
                 }
             }
         });
-
-        // Đảm bảo không âm và không NaN
-        for (const key in finalStats) {
-            finalStats[key] = Math.max(1, finalStats[key] || 1);
-        }
-
+        for (const key in finalStats) finalStats[key] = Math.max(1, finalStats[key] || 1);
         return finalStats;
     }
 
-    // --- XỬ LÝ HIỆU ỨNG (DOT) ---
+    // --- NÂNG CẤP: XỬ LÝ PASSIVE TRONG TURN ---
     processTurnEffects() {
         let turnLog = [];
         let newEffects = [];
         let totalDamage = 0;
         const maxHP = this.calculateFinalStats().HP; 
         
+        // Xử lý Effect cũ
         this.activeEffects.forEach(effect => {
             if (effect.turns > 0) {
                 if (effect.type === 'dot') {
@@ -130,40 +107,44 @@ export class Pet {
                 newEffects.push(effect);
             }
         });
-
         this.activeEffects = newEffects;
+
+        // --- KÍCH HOẠT PASSIVE: REGEN ---
+        if (this.passive === 'REGEN') {
+            const heal = Math.floor(maxHP * 0.05);
+            if (this.currentHP < maxHP && this.currentHP > 0) {
+                this.currentHP = Math.min(maxHP, this.currentHP + heal);
+                turnLog.push(`🌿 **${PASSIVES.REGEN.name}**: Hồi ${heal} HP.`);
+            }
+        }
+
         return { log: turnLog, damage: totalDamage };
     }
     
-    // --- LEVEL UP ---
+    // ... (Giữ nguyên addXp, getStats, getColor) ...
     addXp(amount) {
         if (this.level >= this.maxLevel) return false;
-        
         this.xp += amount;
         let leveledUp = false;
-        
         let xpNeeded = Math.floor(LEVEL_CONFIG.BASE_XP * Math.pow(LEVEL_CONFIG.XP_MULTIPLIER, this.level - 1));
-
         while (this.xp >= xpNeeded && this.level < this.maxLevel) {
             this.xp -= xpNeeded;
             this.level++;
             leveledUp = true;
             xpNeeded = Math.floor(LEVEL_CONFIG.BASE_XP * Math.pow(LEVEL_CONFIG.XP_MULTIPLIER, this.level - 1));
         }
-
         if (leveledUp) {
             this.currentStats = this.calculateStats();
-            // Hồi đầy máu/mana khi lên cấp
             const finals = this.calculateFinalStats();
             this.currentHP = finals.HP; 
             this.currentMP = finals.MP;
         }
         return leveledUp;
     }
-
     getStats() { return this.calculateFinalStats(); }
     getColor() { return RARITY_CONFIG[this.rarity]?.color || 0xFFFFFF; }
 
+    // --- NÂNG CẤP: LƯU THÔNG TIN PASSIVE ---
     getDataForSave() {
         return {
             id: this.id, name: this.name, icon: this.icon,
@@ -171,13 +152,14 @@ export class Pet {
             baseStats: this.baseStats,
             level: this.level, xp: this.xp, gen: this.gen,
             currentHP: this.currentHP, currentMP: this.currentMP,
-            skills: this.skills, activeEffects: this.activeEffects
+            skills: this.skills, activeEffects: this.activeEffects,
+            passive: this.passive // Lưu passive
         };
     }
 }
 
 // ==========================================
-// 2. GAME FUNCTIONS
+// 2. GAME FUNCTIONS (NÂNG CẤP LOGIC)
 // ==========================================
 
 export function calculateDamage(attacker, defender, skillId, currentWeather) { 
@@ -187,25 +169,26 @@ export function calculateDamage(attacker, defender, skillId, currentWeather) {
     const atkStats = attacker.getStats();
     const defStats = defender.getStats();
 
-    // Dùng ATK hoặc SATK
     const atkVal = skill.type === 'Physical' ? atkStats.ATK : atkStats.SATK;
     const defVal = defStats.DEF; 
 
-    // Công thức Damage
     let damage = (atkVal * skill.power) / Math.max(defVal, 1);
     damage *= (0.9 + Math.random() * 0.2);
+
+    // --- KÍCH HOẠT PASSIVE: BERSEKER (Tăng dame khi máu thấp) ---
+    if (attacker.passive === 'BERSEKER' && (attacker.currentHP / atkStats.HP) < 0.3) {
+        damage *= 1.5;
+    }
 
     let multiplier = 1.0;
     let weatherBonusApplied = false;
     
-    // Khắc hệ
     const adv = ELEMENT_ADVANTAGE[skill.element];
     if (adv) {
         if (adv.advantage.includes(defender.element)) multiplier = 1.5; 
         else if (adv.disadvantage.includes(defender.element)) multiplier = 0.5;
     }
 
-    // Thời tiết
     if (skill.weatherBonus && currentWeather && currentWeather.buff.includes(skill.weatherBonus.element)) {
         multiplier *= (1.0 + skill.weatherBonus.power);
         weatherBonusApplied = true;
@@ -213,15 +196,45 @@ export function calculateDamage(attacker, defender, skillId, currentWeather) {
 
     damage *= multiplier;
 
+    // --- KÍCH HOẠT PASSIVE: CRIT_MASTER ---
+    let critChance = 0.15;
+    if (attacker.passive === 'CRIT_MASTER') critChance += 0.20;
+
+    const isCrit = Math.random() < critChance;
+    if (isCrit) damage *= 1.5;
+
+    // --- KÍCH HOẠT PASSIVE: EVASION (Né đòn) ---
+    if (defender.passive === 'EVASION' && Math.random() < 0.10) {
+        damage = 0; // Né hoàn toàn
+    }
+
+    // --- KÍCH HOẠT PASSIVE: VAMPIRISM (Hút máu) ---
+    let vampHeal = 0;
+    if (attacker.passive === 'VAMPIRISM' && damage > 0) {
+        vampHeal = Math.floor(damage * 0.10);
+        attacker.currentHP = Math.min(atkStats.HP, attacker.currentHP + vampHeal);
+    }
+
+    // --- KÍCH HOẠT PASSIVE: THORNS (Phản dame) ---
+    let thornDamage = 0;
+    if (defender.passive === 'THORNS' && damage > 0) {
+        thornDamage = Math.floor(damage * 0.10);
+        attacker.currentHP = Math.max(0, attacker.currentHP - thornDamage);
+    }
+
     return { 
         damage: Math.floor(damage), 
-        isCrit: Math.random() < 0.15,
+        isCrit: isCrit,
         multiplier: multiplier,
         weatherBonusApplied: weatherBonusApplied,
-        skillEffect: skill.effect
+        skillEffect: skill.effect,
+        vampHeal: vampHeal, // Trả về để log
+        thornDamage: thornDamage, // Trả về để log
+        isEvaded: (defender.passive === 'EVASION' && damage === 0)
     };
 }
 
+// ... (Giữ nguyên processSkillEffect, catchPetLogic, createDungeonBoss) ...
 export function processSkillEffect(caster, target, skill, logs, damageGained = 0) {
     if (!skill.effect) return logs;
     const { type, target: effectTarget, stat, value } = skill.effect;
@@ -260,11 +273,10 @@ export function catchPetLogic(currentHP, maxHP, ballRate = 1.0) {
 }
 
 export function createDungeonBoss(difficulty) {
-    const template = PET_TEMPLATES[1]; // Dragonoid
+    const template = PET_TEMPLATES[1]; 
     return new Pet({
         name: `BOSS ${template.name}`,
         race: template.race,
-        // Boss mạnh gấp 5 lần HP, gấp 2 lần ATK/DEF
         baseStats: { 
             HP: template.baseHP * 5, 
             MP: template.baseMP * 2,
@@ -276,12 +288,12 @@ export function createDungeonBoss(difficulty) {
         element: ELEMENTS.DARK,
         rarity: RARITY.MYTHIC,
         level: difficulty * 10,
-        skills: ['fir_ulti', 'dar_ulti', 'phy_19'],
-        gen: 100
+        skills: ['S5', 'S2', 'S4'],
+        gen: 100,
+        passive: 'BERSEKER' // Boss luôn có nội tại này
     });
 }
 
-// [FIX] Đảm bảo spawnWildPet truyền đủ Base Stats
 export function spawnWildPet(isVip = false) {
     let rarity = RARITY.COMMON;
     if (isVip) rarity = RARITY.MYTHIC; 
@@ -301,7 +313,6 @@ export function spawnWildPet(isVip = false) {
     return {
         name: template.name,
         race: template.race,
-        // FIX: Truyền đầy đủ 6 chỉ số gốc
         baseStats: { 
             HP: template.baseHP || 1000,
             MP: template.baseMP || 500,
@@ -315,6 +326,7 @@ export function spawnWildPet(isVip = false) {
         level: wildLevel,
         gen: randomInt(1, 100),
         icon: randomElement(EMOJIS.PET_ICONS),
-        skills: getRandomSkills(rarity)
+        skills: getRandomSkills(rarity),
+        passive: template.passive || null // Lấy passive từ template
     };
 }

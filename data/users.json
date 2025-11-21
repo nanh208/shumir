@@ -19,20 +19,42 @@
         "level": 1,
         "xp": 0,
         "gen": 36,
-        "currentHP": 1019,
-        "currentMP": 256,
+        "currentHP": 993,
+        "currentMP": 399,
         "skills": [
           "S1",
           "ear_heal_2",
           "phy_06",
           "gra_slow_1"
         ],
-        "activeEffects": []
+        "activeEffects": [
+          {
+            "name": "Thiết Giáp Nhỏ",
+            "stat": "DEF",
+            "value": 0.15,
+            "type": "buff",
+            "turns": 0
+          },
+          {
+            "name": "Thiết Giáp Nhỏ",
+            "stat": "DEF",
+            "value": 0.15,
+            "type": "buff",
+            "turns": 2
+          },
+          {
+            "name": "Thiết Giáp Nhỏ",
+            "stat": "DEF",
+            "value": 0.15,
+            "type": "buff",
+            "turns": 3
+          }
+        ]
       }
     ],
     "inventory": {
       "candies": {
-        "normal": 4,
+        "normal": 0,
         "high": 0,
         "super": 0
       },
@@ -40,9 +62,59 @@
         "common": 0,
         "mythic": 0
       },
-      "skillBooks": []
+      "skillBooks": [],
+      "potions": 2
     },
     "codesRedeemed": [],
-    "hasClaimedStarter": true
+    "hasClaimedStarter": true,
+    "gold": 1000
+  },
+  "1185865935874162830": {
+    "pets": [
+      {
+        "id": "mi8pkixarpcf6gq0ag",
+        "name": "Slime",
+        "icon": "<a:source:1440702357523660820>",
+        "element": "Dragon",
+        "race": "Elemental",
+        "rarity": "Common",
+        "baseStats": {
+          "HP": 1500,
+          "MP": 400,
+          "ATK": 950,
+          "DEF": 1000,
+          "SPD": 80,
+          "SATK": 950
+        },
+        "level": 9,
+        "xp": 100,
+        "gen": 82,
+        "currentHP": 1595,
+        "currentMP": 349,
+        "skills": [
+          "S1",
+          "dra_mag_1",
+          "phy_03",
+          "wat_heal_1"
+        ],
+        "activeEffects": []
+      }
+    ],
+    "inventory": {
+      "candies": {
+        "normal": 0,
+        "high": 0,
+        "super": 0
+      },
+      "crates": {
+        "common": 0,
+        "mythic": 0
+      },
+      "skillBooks": [],
+      "potions": 0
+    },
+    "codesRedeemed": [],
+    "hasClaimedStarter": true,
+    "createdAt": 1763720326501
   }
 }
