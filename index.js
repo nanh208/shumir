@@ -170,11 +170,19 @@ client.once(Events.ClientReady, async () => {
     });
     
     // Đợi load xong các module ESM rồi mới khởi động hệ thống Pet
-    await loadGameModules();
+await loadGameModules();
     
     if (SpawnSystem) {
+        // 1. Khởi tạo Spawn System (Nó sẽ tự tạo RaidBossManager bên trong)
         spawner = new SpawnSystem(client); 
-        if (setSpawnSystemRef) setSpawnSystemRef(spawner); 
+        
+        // 2. [QUAN TRỌNG] Truyền RaidManager sang cho BattleManager
+        // Để khi đánh nhau, BattleManager biết gửi damage đi đâu
+        if (BattleModule && BattleModule.setRaidManagerRef) {
+            BattleModule.setRaidManagerRef(spawner.raidManager);
+        }
+
+        // 3. Khởi động hệ thống Spawn
         spawner.start(); 
     }
 });

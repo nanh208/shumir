@@ -1,4 +1,4 @@
-// Constants.mjs
+// File: Constants.mjs (FINAL VERSION - Bổ sung Phần thưởng)
 
 // === 1. EMOJIS & COLORS ===
 export const EMOJIS = {
@@ -12,8 +12,9 @@ export const EMOJIS = {
     CANDY_NORMAL: '🍬',
     CANDY_HIGH: '🍭',
     CANDY_SUPER: '🍮',
+    CANDY_ULTRA: '🌟', 
     BOX_COMMON: '📦',
-    BOX_MYTHIC: '👑',
+    BOX_MYTHIC: '👑', // Rương Thần Thoại
     BALL: '🔴',
     SWORD: '⚔️',
     SHIELD: '🛡️',
@@ -30,12 +31,12 @@ export const RARITY_COLORS = {
 
 // === 2. PHẨM CHẤT (RARITY) & SCALING ===
 export const RARITY_CONFIG = {
-    'Common':    { statMultiplier: 1.0, maxLv: 100, ballRate: 0.50, spawnRate: 0.45,  color: RARITY_COLORS.Common, icon: '⚪' },
-    'Uncommon':  { statMultiplier: 1.2, maxLv: 100, ballRate: 0.60, spawnRate: 0.25,  color: RARITY_COLORS.Uncommon, icon: '🌿' },
-    'Rare':      { statMultiplier: 1.5, maxLv: 100, ballRate: 0.65, spawnRate: 0.15,  color: RARITY_COLORS.Rare, icon: '💧' },
-    'Epic':      { statMultiplier: 1.8, maxLv: 100, ballRate: 0.70, spawnRate: 0.10,  color: RARITY_COLORS.Epic, icon: '🔥' },
-    'Legendary': { statMultiplier: 2.4, maxLv: 100, ballRate: 1.00, spawnRate: 0.04,  color: RARITY_COLORS.Legendary, icon: '✨' },
-    'Mythic':    { statMultiplier: 3.2, maxLv: 100, ballRate: 1.00, spawnRate: 0.01,  color: RARITY_COLORS.Mythic, icon: '👑' }
+    'Common':    { statMultiplier: 1.0, maxLv: 100, ballRate: 0.50, spawnRate: 0.45,  color: RARITY_COLORS.Common, icon: '⚪' },
+    'Uncommon':  { statMultiplier: 1.2, maxLv: 100, ballRate: 0.60, spawnRate: 0.25,  color: RARITY_COLORS.Uncommon, icon: '🌿' },
+    'Rare':      { statMultiplier: 1.5, maxLv: 100, ballRate: 0.65, spawnRate: 0.15,  color: RARITY_COLORS.Rare, icon: '💧' },
+    'Epic':      { statMultiplier: 1.8, maxLv: 100, ballRate: 0.70, spawnRate: 0.10,  color: RARITY_COLORS.Epic, icon: '🔥' },
+    'Legendary': { statMultiplier: 2.4, maxLv: 100, ballRate: 1.00, spawnRate: 0.04,  color: RARITY_COLORS.Legendary, icon: '✨' },
+    'Mythic':    { statMultiplier: 3.2, maxLv: 100, ballRate: 1.00, spawnRate: 0.01,  color: RARITY_COLORS.Mythic, icon: '👑' }
 };
 
 export const RARITY = {
@@ -79,40 +80,10 @@ export const ELEMENT_ADVANTAGE = {
 export const LEVEL_CONFIG = {
     BASE_XP: 100,
     XP_MULTIPLIER: 1.15,
-    POINTS_PER_LEVEL: 25 // Mỗi level tặng thêm tổng 25 điểm stat
+    POINTS_PER_LEVEL: 25 
 };
 
-// === 5. TỘC HỆ ===
-export const RACES = {
-    HUMAN: 'Human', DWARF: 'Dwarf', ELF: 'Elf', ORC: 'Orc', 
-    DRAGON: 'Dragon', BEAST: 'Beast', ELEMENTAL: 'Elemental'
-};
-
-// === 6. ITEMS ===
-export const CANDIES = {
-    NORMAL: { name: 'Kẹo Bình Thường', xp: 200, emoji: EMOJIS.CANDY_NORMAL },
-    HIGH:   { name: 'Kẹo Cao Cấp', xp: 1000, emoji: EMOJIS.CANDY_HIGH },
-    SUPER:  { name: 'Kẹo Siêu Cấp', xp: 2000, emoji: EMOJIS.CANDY_SUPER }
-};
-
-// === 7. HỆ THỐNG NỘI TẠI (PASSIVES) ===
-export const PASSIVES = {
-    'VAMPIRISM': { id: 'VAMPIRISM', name: '🩸 Huyết Tộc', desc: 'Hồi 10% HP dựa trên sát thương gây ra.', trigger: 'onAttack' },
-    'BERSEKER':  { id: 'BERSEKER',  name: '😡 Cuồng Nộ',  desc: 'Khi HP dưới 30%, tăng 50% Sát thương.', trigger: 'onCalcDamage' },
-    'REGEN':     { id: 'REGEN',     name: '🌿 Tái Tạo',   desc: 'Hồi 5% HP tối đa mỗi lượt.', trigger: 'onTurnEnd' },
-    'THORNS':    { id: 'THORNS',    name: '🌵 Giáp Gai',  desc: 'Phản lại 10% sát thương nhận vào.', trigger: 'onDefend' },
-    'EVASION':   { id: 'EVASION',   name: '👻 Bóng Ma',   desc: 'Có 10% cơ hội né hoàn toàn đòn đánh.', trigger: 'onReceiveDamage' },
-    'CRIT_MASTER':{ id: 'CRIT_MASTER',name: '🎯 Bách Phát',desc: 'Tăng 20% tỷ lệ chí mạng.', trigger: 'onCritCheck' }
-};
-
-// === 8. CẤU HÌNH TIẾN HÓA ===
-export const EVOLUTION_CHAINS = {
-    'Pika-Chu': { target: 'Raichu-God', level: 20, material: 'Thunder Stone' },
-    'Slime':    { target: 'King Slime', level: 15, material: null },
-    'Dragonoid':{ target: 'Bahamut',    level: 30, material: 'Dragon Scale' }
-};
-
-// === 9. PET TEMPLATES ===
+// === 5. TỘC HỆ & TEMPLATES ===
 export const PET_TEMPLATES = [
     { name: "Pika-Chu", race: "Beast", baseHP: 1000, baseMP: 500, baseATK: 1050, baseSATK: 1100, baseDEF: 1000, baseSPD: 120 },
     { name: "Dragonoid", race: "Dragon", baseHP: 1200, baseMP: 600, baseATK: 1250, baseSATK: 1250, baseDEF: 1100, baseSPD: 100 },
@@ -125,18 +96,107 @@ export const PET_TEMPLATES = [
     { name: "Shadow", race: "Unknown", baseHP: 1000, baseMP: 500, baseATK: 1300, baseSATK: 1100, baseDEF: 1000, baseSPD: 115 }
 ];
 
-// === 10. SKILLS ===
-export const SKILLS = [
-    { id: 'S1', name: 'Tát Nước', element: 'Water', type: 'SATK', power: 25, multiplier: 1 },
-    { id: 'S2', name: 'Đốt Cháy', element: 'Fire', type: 'SATK', power: 30, multiplier: 0.9 },
-    { id: 'S3', name: 'Hút Năng Lượng', element: 'Grass', type: 'SATK', power: 15, multiplier: 1.2 },
-    { id: 'S4', name: 'Đấm Mạnh', element: 'Physical', type: 'ATK', power: 20, multiplier: 1.0 },
-    { id: 'S5', name: 'Sấm Sét', element: 'Thunder', type: 'SATK', power: 40, multiplier: 0.8 },
+// === 6. ITEMS, CANDIES & SKILLBOOKS ===
+export const CANDIES = {
+    NORMAL: { name: 'Kẹo Bình Thường', xp: 200, emoji: EMOJIS.CANDY_NORMAL },
+    HIGH:   { name: 'Kẹo Cao Cấp', xp: 1000, emoji: EMOJIS.CANDY_HIGH },
+    SUPER:  { name: 'Kẹo Siêu Cấp', xp: 2000, emoji: EMOJIS.CANDY_SUPER },
+    ULTRA:  { name: 'Kẹo Tối Thượng', xp: 10000, emoji: EMOJIS.CANDY_ULTRA }
+};
+
+export const SKILLBOOK_CONFIG = {
+    T1: { name: 'Sách Skill Cấp I', emoji: '📖', tier: 1, skills: ['S1', 'S2'] },
+    T2: { name: 'Sách Skill Cấp II', emoji: '📘', tier: 2, skills: ['S3', 'S4'] },
+    LEGEND: { name: 'Sách Skill Huyền Thoại', emoji: '📜', tier: 3, skills: ['S5'] }
+};
+
+// CẤU HÌNH TÊN HIỂN THỊ CỦA CÁC VẬT PHẨM DROP
+export const ITEM_CONFIG = {
+    'MYTHIC_STONE': { name: 'Đá Thần Thoại', emoji: '💎' },
+    'LEGEND_ESSENCE': { name: 'Tinh Hoa Huyền Thoại', emoji: '🌟' },
+    'MYTHIC_CHEST': { name: 'Rương Thần Thoại', emoji: EMOJIS.BOX_MYTHIC }, 
+    'LEGEND_SKILLBOOK': { name: SKILLBOOK_CONFIG.LEGEND.name, emoji: SKILLBOOK_CONFIG.LEGEND.emoji }, 
+    'RARE_CANDY': { name: CANDIES.HIGH.name, emoji: CANDIES.HIGH.emoji },
+    'GOLD_COIN': { name: 'Đồng Xu Vàng', emoji: '💰' } 
+};
+
+// === 7. HỆ THỐNG NỘI TẠI (PASSIVES) ===
+export const PASSIVES = {
+    'VAMPIRISM': { id: 'VAMPIRISM', name: '🩸 Huyết Tộc', desc: 'Hồi 10% HP dựa trên sát thương gây ra.', trigger: 'onAttack' },
+    'BERSEKER':  { id: 'BERSEKER',  name: '😡 Cuồng Nộ',  desc: 'Khi HP dưới 30%, tăng 50% Sát thương.', trigger: 'onCalcDamage' },
+    'REGEN':     { id: 'REGEN',     name: '🌿 Tái Tạo',   desc: 'Hồi 5% HP tối đa mỗi lượt.', trigger: 'onTurnEnd' },
+    'THORNS':    { id: 'THORNS',    name: '🌵 Giáp Gai',  desc: 'Phản lại 10% sát thương nhận vào.', trigger: 'onDefend' },
+    'EVASION':   { id: 'EVASION',   name: '👻 Bóng Ma',   desc: 'Có 10% cơ hội né hoàn toàn đòn đánh.', trigger: 'onReceiveDamage' },
+    'CRIT_MASTER':{ id: 'CRIT_MASTER',name: '🎯 Bách Phát',desc: 'Tăng 20% tỷ lệ chí mạng.', trigger: 'onCritCheck' }
+};
+
+// === 8. CẤU HÌNH TIẾN HÓA ===
+export const EVOLUTION_CHAINS = {
+    'Pika-Chu': { target: 'Raichu-God', level: 20, material: 'Thunder Stone' },
+    'Slime':    { target: 'King Slime', level: 15, material: null },
+    'Dragonoid':{ target: 'Bahamut',    level: 30, material: 'Dragon Scale' }
+};
+
+// === 9. CẤU HÌNH ĐỘ KHÓ SERVER (LEVEL SERVER) ===
+export const DIFFICULTY_LEVELS = {
+    'dễ': { 
+        name: 'Dễ', 
+        multiplier: 1.0, 
+        description: 'Mặc định, chỉ số Pet được giữ nguyên.' 
+    },
+    'bth': { 
+        name: 'Bình Thường', 
+        multiplier: 3.0, 
+        description: 'Thử thách vừa phải (x3.0).',
+    },
+    'khó': { 
+        name: 'Khó', 
+        multiplier: 10.0, 
+        description: 'Chỉ số Pet nhân x10.0 so với gốc.',
+    },
+    'siêu khó': { 
+        name: 'Siêu Khó', 
+        multiplier: 50.0, 
+        description: 'Thử thách cực đại (x50.0).',
+    },
+    'ác quỷ': { 
+        name: 'Ác Quỷ', 
+        multiplier: 250.0, 
+        description: 'Độ khó cực cao (x250.0).',
+    },
+    'kẻ hủy diệt': { 
+        name: 'Kẻ Hủy Diệt', 
+        multiplier: 1000.0, 
+        description: 'Thử thách tối thượng (x1000.0).',
+    }
+};
+
+// === 10. CẤU HÌNH BOSS RAID & THƯỞNG ===
+
+export const RAID_BOSS_HOURS = [1, 4, 7, 10, 13, 16, 19, 22]; 
+export const RAID_BOSS_MINUTE = 30;                             
+
+export const BOSS_REWARD_TIERS = {
+    'TOP_1': { minDamage: 0.80, guaranteed: 2, rare_drop_bonus: 0.50 }, 
+    'TIER_S': { minDamage: 0.50, guaranteed: 1, rare_drop_bonus: 0.30 }, 
+    'TIER_A': { minDamage: 0.20, guaranteed: 0, rare_drop_bonus: 0.15 }, 
+    'TIER_B': { minDamage: 0.05, guaranteed: 0, rare_drop_bonus: 0.05 }, 
+    'PARTICIPANT': { minDamage: 0.0001, guaranteed: 0, rare_drop_bonus: 0.01 }, 
+};
+
+// ĐÃ CẬP NHẬT: THÊM RƯƠNG VÀ SÁCH SKILL VÀO DROP LIST
+export const BOSS_DROPS = [
+    { item_id: 'MYTHIC_CHEST', rarity: 'Mythic', chance: 0.005 },          // Rương Thần Thoại (0.5%)
+    { item_id: 'LEGEND_SKILLBOOK', rarity: 'Legendary', chance: 0.03 },    // Sách Skill Huyền Thoại (3%)
+    { item_id: 'MYTHIC_STONE', rarity: 'Mythic', chance: 0.01 }, 
+    { item_id: 'LEGEND_ESSENCE', rarity: 'Legendary', chance: 0.05 }, 
+    { item_id: 'RARE_CANDY', rarity: 'Rare', chance: 0.20 }, 
+    { item_id: 'GOLD_COIN', rarity: 'Common', chance: 1.00 }
 ];
 
-// 💡 BỔ SUNG: SKILLBOOK CONFIG ĐỂ SỬA LỖI
-export const SKILLBOOK_CONFIG = {
-    'S_Fire': { name: 'Sách Lửa 🔥', skillId: 'S2', rarity: 'Rare', icon: '🔥' }, 
-    'S_Heal': { name: 'Sách Hồi Máu 💖', skillId: 'S3', rarity: 'Common', icon: '💖' },
-    'S_Epic': { name: 'Sách Sử Thi ✨', skillId: 'S4', rarity: 'Epic', icon: '✨' }
-};
+// === 11. CẤU HÌNH SPAWN PET HIẾM THEO LỊCH ===
+export const SCHEDULED_SPAWN_HOURS = [0, 3, 6, 9, 12, 15, 18, 21]; 
+export const SCHEDULED_RARITIES = [
+    RARITY.LEGENDARY, 
+    RARITY.MYTHIC 
+];

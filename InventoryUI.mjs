@@ -15,7 +15,7 @@ import {
     EMOJIS, 
     RARITY_COLORS, 
     RARITY_CONFIG, 
-    CANDIES, 
+    CANDIES, // Đã bao gồm ULTRA
     ELEMENT_ICONS,
     SKILLBOOK_CONFIG 
 } from './Constants.mjs';
@@ -35,7 +35,7 @@ function createProgressBar(current, max, totalChars = 10) {
 }
 
 // ==========================================
-// 1. GIAO DIỆN CHÍNH: TÚI ĐỒ & KHO PET
+// 1. GIAO DIỆN CHÍNH: TÚI ĐỒ & KHO PET (ĐÃ CẬP NHẬT CANDY)
 // ==========================================
 
 export async function showInventory(interaction, page = 0) {
@@ -51,16 +51,17 @@ export async function showInventory(interaction, page = 0) {
 
     // --- TẠO NỘI DUNG EMBED (ITEM LIST) ---
     let itemDesc = `**${EMOJIS.STAR} VẬT PHẨM TIÊU THỤ:**\n`;
-    const candyList = [
-        { key: 'normal', cfg: CANDIES.NORMAL },
-        { key: 'high', cfg: CANDIES.HIGH },
-        { key: 'super', cfg: CANDIES.SUPER || { name: 'Kẹo Siêu Cấp', emoji: '🍮' } }
-    ];
+    
+    // [CẬP NHẬT]: Duyệt qua tất cả loại kẹo từ Constants
+    const candyKeys = Object.keys(CANDIES);
     let hasCandy = false;
-    candyList.forEach(c => {
-        const qty = inv.candies[c.key] || 0;
-        if (qty > 0) { itemDesc += `${c.cfg.emoji} **${c.cfg.name}**: \`${qty}\`\n`; hasCandy = true; }
+    
+    candyKeys.forEach(key => {
+        const cfg = CANDIES[key];
+        const qty = inv.candies[key.toLowerCase()] || 0; // Đảm bảo key inventory là chữ thường
+        if (qty > 0) { itemDesc += `${cfg.emoji} **${cfg.name}**: \`${qty}\`\n`; hasCandy = true; }
     });
+
     if (!hasCandy) itemDesc += "*Không có kẹo nào.*\n";
     itemDesc += `\n**${EMOJIS.BOX_COMMON} VẬT PHẨM KHÁC:**\n💊 Thuốc Hồi Phục: \`${inv.potions || 0}\`\n`;
 
@@ -129,7 +130,6 @@ export async function showInventory(interaction, page = 0) {
     // XỬ LÝ GỬI TIN NHẮN AN TOÀN
     // ==========================================
 
-    // 1. Nếu là lệnh Slash Command gọi từ Server (Guild) -> Gửi vào DM
     if (!interaction.isButton() && interaction.guild) {
         if (!interaction.deferred && !interaction.replied) {
             try {
@@ -152,7 +152,6 @@ export async function showInventory(interaction, page = 0) {
         return;
     }
 
-    // 2. Update trong DM
     try {
         if (interaction.isButton && interaction.isButton()) {
             await interaction.update(payload).catch(() => interaction.editReply(payload));
@@ -220,7 +219,6 @@ export async function showPetDetails(interaction, petIndex) {
 
     const payload = { content: null, embeds: [embed], components: [rowActions, rowBack] };
     
-    // LOGIC AN TOÀN: Nếu đã defer/reply thì dùng editReply, chưa thì update
     try {
         if (interaction.deferred || interaction.replied) {
             await interaction.editReply(payload);
@@ -231,7 +229,7 @@ export async function showPetDetails(interaction, petIndex) {
 }
 
 // ==========================================
-// 3. CÁC MENU PHỤ
+// 3. CÁC MENU PHỤ (ĐÃ CẬP NHẬT CANDY)
 // ==========================================
 
 export async function showFeedMenu(interaction, petIndex) {
@@ -244,18 +242,35 @@ export async function showFeedMenu(interaction, petIndex) {
     const embed = new EmbedBuilder()
         .setTitle(`🍽️ CHO ${p.name.toUpperCase()} ĂN`)
         .setDescription(`Cấp độ hiện tại: **${p.level}/${maxLv}**\nXP hiện tại: \`${p.currentExp}/${p.getExpToNextLevel()}\`\n\n**Chọn loại kẹo muốn sử dụng:**`)
-        .setColor(0x00FF00)
-        .addFields(
-            { name: `${EMOJIS.CANDY_NORMAL} Kẹo Thường`, value: `Còn: **${inv.normal || 0}**\nXP: +${CANDIES.NORMAL.xp}`, inline: true },
-            { name: `${EMOJIS.CANDY_HIGH} Kẹo Cao Cấp`, value: `Còn: **${inv.high || 0}**\nXP: +${CANDIES.HIGH.xp}`, inline: true },
-            { name: `${EMOJIS.CANDY_SUPER || '🍮'} Kẹo Siêu Cấp`, value: `Còn: **${inv.super || 0}**\nXP: +${CANDIES.SUPER?.xp || 2000}`, inline: true }
-        );
+        .setColor(0x00FF00); 
 
-    const rowCandies = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`inv_feed_normal_${petIndex}`).setLabel('Dùng Kẹo Thường').setStyle(ButtonStyle.Primary).setDisabled(!inv.normal),
-        new ButtonBuilder().setCustomId(`inv_feed_high_${petIndex}`).setLabel('Dùng Kẹo Cao Cấp').setStyle(ButtonStyle.Primary).setDisabled(!inv.high),
-        new ButtonBuilder().setCustomId(`inv_feed_super_${petIndex}`).setLabel('Dùng Kẹo Siêu Cấp').setStyle(ButtonStyle.Primary).setDisabled(!inv.super)
-    );
+    const rowCandies = new ActionRowBuilder();
+    
+    // [CẬP NHẬT]: Duyệt qua tất cả các loại kẹo có trong Constants để tạo Fields và Buttons
+    const candyKeys = Object.keys(CANDIES);
+    
+    candyKeys.forEach(key => {
+        const cfg = CANDIES[key];
+        const qty = inv[key.toLowerCase()] || 0;
+        const keyLower = key.toLowerCase();
+
+        // Tạo Field
+        embed.addFields({ 
+            name: `${cfg.emoji} ${cfg.name}`, 
+            value: `Còn: **${qty}**\nXP: +${cfg.xp}`, 
+            inline: true 
+        });
+
+        // Tạo Button
+        rowCandies.addComponents(
+            new ButtonBuilder()
+                .setCustomId(`inv_feed_${keyLower}_${petIndex}`)
+                .setLabel(`Dùng ${cfg.name.split(' ').pop()}`) // Dùng tên cuối (Thường, Cấp, Tối Thượng)
+                .setStyle(ButtonStyle.Primary)
+                .setDisabled(qty <= 0)
+        );
+    });
+
     const rowBack = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`inv_show_details_${petIndex}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary));
 
     const payload = { embeds: [embed], components: [rowCandies, rowBack] };
@@ -322,12 +337,10 @@ export async function showSkillLearnMenu(interaction, petIndex) {
 }
 
 // ==========================================
-// 4. HANDLERS (ĐÃ SỬA LỖI)
+// 4. HANDLERS
 // ==========================================
 
-// Xử lý chọn đồng hành
 export async function handleEquipPet(interaction, petIndex) {
-    // [FIX QUAN TRỌNG]: Báo cho Discord biết là "Tôi đang xử lý" ngay lập tức
     await interaction.deferUpdate();
 
     const userId = interaction.user.id;
@@ -338,19 +351,16 @@ export async function handleEquipPet(interaction, petIndex) {
 
     const pName = userData.pets[petIndex].name;
     
-    // Gửi thông báo (Lúc này dùng followUp mới hợp lệ vì đã deferUpdate)
     await interaction.followUp({ 
         content: `✅ Đã chọn **${pName}** làm bạn đồng hành chiến đấu!`, 
         flags: [MessageFlags.Ephemeral] 
     });
     
-    // Cập nhật giao diện
     await showPetDetails(interaction, petIndex);
 }
 
-// Xử lý cho ăn
+// Xử lý cho ăn (ĐÃ CẬP NHẬT LOGIC CANDY)
 export async function handleFeed(interaction, petIndex, candyType) {
-    // [FIX QUAN TRỌNG]
     await interaction.deferUpdate();
 
     const userId = interaction.user.id;
@@ -361,12 +371,14 @@ export async function handleFeed(interaction, petIndex, candyType) {
     const candyKey = candyType.toUpperCase();
     const candyCfg = CANDIES[candyKey];
 
+    // Kiểm tra kho dựa trên key chữ thường
     if (!userData.inventory.candies[candyType]) {
          return interaction.followUp({ content: `🚫 Hết ${candyCfg?.name || 'kẹo'}!`, flags: [MessageFlags.Ephemeral] });
     }
 
     userData.inventory.candies[candyType]--;
     
+    // Thêm XP (Giả định candyCfg.xp tồn tại)
     const leveledUp = p.addExp(candyCfg.xp, POINTS_PER_LEVEL);
     
     userData.pets[petIndex] = p.getDataForSave();
@@ -381,7 +393,6 @@ export async function handleFeed(interaction, petIndex, candyType) {
 
 // Xử lý nâng stats
 export async function handleStatUpgrade(interaction, petIndex, statKey) {
-    // [FIX QUAN TRỌNG]
     await interaction.deferUpdate();
 
     const userId = interaction.user.id;
@@ -407,6 +418,10 @@ export async function handleStatUpgrade(interaction, petIndex, statKey) {
 
 export async function handleInventoryInteraction(interaction) {
     const { customId } = interaction;
+    
+    // Hàm này sẽ dùng customId.split('_')[2] để lấy key (normal, high, super, ultra)
+    // và xử lý logic feed/upgrade
+    // ... (Router logic remains the same) ...
 
     if (customId === 'inv_refresh') {
         await showInventory(interaction, 0);
@@ -436,9 +451,10 @@ export async function handleInventoryInteraction(interaction) {
         await showSkillLearnMenu(interaction, index);
     }
     else if (customId.startsWith('inv_feed_')) {
+        // Xử lý inv_feed_KEY_INDEX
         const parts = customId.split('_');
         const index = parseInt(parts.pop());
-        const type = parts[2]; 
+        const type = parts[2]; // Lấy key chữ thường (normal, high, super, ultra)
         await handleFeed(interaction, index, type);
     }
     else if (customId.startsWith('inv_upgrade_stat_')) {

@@ -32,23 +32,42 @@ const petCommands = [
         .addSubcommand(sub => sub.setName('random').setDescription('🎁 Nhận Pet khởi đầu ngẫu nhiên'))
         .addSubcommand(sub => sub.setName('info').setDescription('ℹ️ Xem thông tin chi tiết Pet của bạn'))
         .addSubcommand(sub => sub.setName('list').setDescription('📜 Xem danh sách tất cả Pet trong kho'))
-        // 💡 THAY ĐỔI: Gộp Evolve vào /pet
+        .addSubcommand(sub => sub.setName('help').setDescription('📜 Xem hướng dẫn chơi Pet Game'))
+        // Gộp Evolve
         .addSubcommand(sub => 
             sub.setName('evolve')
             .setDescription('🧬 Tiến hóa Pet khi đủ cấp độ')
             .addIntegerOption(op => op.setName('slot').setDescription('Vị trí Pet muốn tiến hóa').setRequired(false))
         )
-        // 💡 THAY ĐỔI: Gộp Gacha vào /pet
+        // Gộp Gacha
         .addSubcommand(sub => sub.setName('gacha').setDescription('🎰 Quay Pet may mắn (Giá: 500 Gold)')), 
 
     new SlashCommandBuilder().setName('inventory').setDescription('🎒 Xem túi đồ và danh sách Pet'),
     
     new SlashCommandBuilder().setName('adventure').setDescription('⚔️ Đưa Pet đi ải (PvE)'),
 
+    new SlashCommandBuilder().setName('pvp').setDescription('🥊 Thách đấu PvP với người chơi khác')
+        .addUserOption(option => option.setName('opponent').setDescription('Người chơi bạn muốn thách đấu').setRequired(true)),
+
     new SlashCommandBuilder().setName('code').setDescription('🎁 Nhập mã Giftcode')
         .addStringOption(op => op.setName('code').setDescription('Mã code').setRequired(true)),
 
-    new SlashCommandBuilder().setName('petdemo').setDescription('🛠️ Nhận Pet Demo Mythic để test (Tất cả mọi người)'),
+    // [MỚI] LỆNH ĐỘ KHÓ SERVER
+    new SlashCommandBuilder().setName('lvsv').setDescription('⚙️ Cài đặt độ khó Server (Admin)')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .addStringOption(option => 
+            option.setName('độ_khó')
+                .setDescription('Chọn mức độ khó')
+                .setRequired(true)
+                .addChoices(
+                    { name: 'Dễ (x1)', value: 'dễ' },
+                    { name: 'Bình Thường (x3)', value: 'bth' },
+                    { name: 'Khó (x10)', value: 'khó' },
+                    { name: 'Siêu Khó (x50)', value: 'siêu khó' },
+                    { name: 'Ác Quỷ (x250)', value: 'ác quỷ' },
+                    { name: 'Kẻ Hủy Diệt (x1000)', value: 'kẻ hủy diệt' }
+                )
+        ),
 
     new SlashCommandBuilder().setName('setup_spawn').setDescription('⚙️ Cài đặt kênh Pet (Chỉ Admin)')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
@@ -65,7 +84,6 @@ const petCommands = [
                 .addIntegerOption(op => op.setName('slot').setDescription('Vị trí Pet trong túi (1, 2...)').setRequired(true))
                 .addIntegerOption(op => op.setName('price').setDescription('Giá bán (Gold)').setRequired(true))
         )
-        // 💡 THAY ĐỔI: Thêm subcommand Buy
         .addSubcommand(sub => 
             sub.setName('buy')
                 .setDescription('🛒 Mua Pet từ người khác')
@@ -106,8 +124,9 @@ if (fs.existsSync(commandsPath)) {
             const command = require(file);
             const cmdData = command.default?.data || command.data; 
             if (cmdData) {
+                // Bỏ qua nếu trùng tên với lệnh thủ công
                 if (commandNames.has(cmdData.name)) {
-                     console.warn(`⚠️  Bỏ qua file ${path.basename(file)} vì trùng lệnh /${cmdData.name}.`);
+                     console.warn(`⚠️  Bỏ qua file ${path.basename(file)} vì trùng lệnh /${cmdData.name}.`);
                      continue;
                 }
                 commands.push(cmdData.toJSON());
@@ -133,6 +152,7 @@ const rest = new REST({ version: "10" }).setToken(TOKEN);
         console.log(`🔄 Bắt đầu làm mới lệnh ứng dụng...`);
         if (IS_GLOBAL) {
             console.log("🌎 Đang deploy GLOBAL...");
+            // Xóa lệnh Guild cũ trước khi deploy Global để tránh trùng lặp
             await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: [] });
             const data = await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
             console.log(`✅ Đã reload ${data.length} lệnh GLOBAL!`);

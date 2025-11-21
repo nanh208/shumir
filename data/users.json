@@ -78,12 +78,12 @@
           "DEF": 1500,
           "SPD": 50
         },
-        "level": 9,
-        "xp": 243,
+        "level": 13,
+        "xp": 148,
         "gen": 57,
-        "statPoints": 18,
-        "currentHP": 6151,
-        "currentMP": 1118,
+        "statPoints": 30,
+        "currentHP": 6217,
+        "currentMP": 1184,
         "skills": [
           "S1",
           "lig_buff_4",
@@ -104,7 +104,7 @@
     ],
     "inventory": {
       "candies": {
-        "normal": 16,
+        "normal": 22,
         "high": 1,
         "super": 0
       },
@@ -113,12 +113,12 @@
         "mythic": 0
       },
       "skillBooks": [],
-      "potions": 10
+      "potions": 13
     },
     "codesRedeemed": [],
     "hasClaimedStarter": true,
     "gold": 5000,
-    "activePetIndex": 1
+    "activePetIndex": 0
   },
   "1185865935874162830": {
     "pets": [

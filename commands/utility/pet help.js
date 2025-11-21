@@ -15,143 +15,64 @@ module.exports = {
       return interaction.reply({ content: "Lệnh không hợp lệ.", ephemeral: true });
 
     const embed = new EmbedBuilder()
-      .setColor("#ff9ce6")
+      .setColor("#ff85a2") // Màu hồng đào, hài hòa hơn
       .setTitle("⋆｡‧˚ʚ♡ɞ˚‧｡⋆ PET GAME - HƯỚNG DẪN CHI TIẾT ⋆｡‧˚ʚ♡ɞ˚‧｡⋆")
       .setDescription(`
 ◇─◇──◇─────◇──◇─◇
-│   ✧･ﾟ:* ✧･ﾟ:* PET SYSTEM V2 *:･ﾟ✧*:･ﾟ✧   │
+│   ✧･ﾟ:* ✧･ﾟ:* PET SYSTEM V2 *:･ﾟ✧*:･ﾟ✧   │
 ◇─◇──◇─────◇──◇─◇
 
 ˗ˏˋ ★ ˎˊ˗ Hệ thống thú nuôi chiến đấu, tiến hóa, kỹ năng và PvP 1v1 cực cuốn! ✦ ˗ˏˋ ★ ˎˊ˗
-
-
-◆ ━━━━━━ ◦ ❖ ◦ ━━━━━━ ◆ Cú pháp cơ bản ◆ ━━━━━━ ◦ ❖ ◦ ━━━━━━ ◆
-\`\`\`
-/pet [subcommand] [options]
-\`\`\`
-
-
-⋆｡‧˚ʚ♡ɞ˚‧｡⋆ Lưu ý quan trọng ⋆｡‧˚ʚ♡ɞ˚‧｡⋆  
-✧ Bot cần quyền gửi embed & button để hoạt động tốt nhất.
-
-
-╭─────────────────────────────────────╮
-│        ★ ☆ ★ LỆNH CON ★ ☆ ★        │
-╰─────────────────────────────────────╯
-
-**+ spawn** → Gọi thú rừng ngẫu nhiên  
-**+ catch** → Bắt thú bằng Capsule  
-**+ info** → Xem thông tin thú của bạn  
-**+ inventory** → Xem toàn bộ thú  
-**+ upgrade** → Nâng cấp / tiến hóa  
-**+ skills** → Xem kỹ năng nguyên tố & vật lý  
-**+ pvp** → Thách đấu người chơi khác  
-**+ team** → Gán thú làm thú chính  
-**+ help** → Hiện hướng dẫn này  
-
-
-✧･ﾟ: ✧･ﾟ: ♡ ︎HỆ THỐNG GAME ♡ :･ﾟ✧:･ﾟ✧
-┌─・°*。✧･ﾟ: *✧･ﾟ:*────*:･ﾟ✧*:･ﾟ✧。*°・─┐
-│             VAI TRÒ & CẤU TRÚC PET GAME          │
-└─・°*。✧･ﾟ: *✧･ﾟ:*────*:･ﾟ✧*:･ﾟ✧。*°・─┘
-
-**[★] Wild Pet System** → Pet xuất hiện ngẫu nhiên  
-**[★] Capture System** → Capsule có tỉ lệ bắt khác nhau  
-**[★] Battle System** → Đánh theo lượt, dùng skill  
-**[★] Element System** → Nước, Lửa, Cỏ, Sét, Bóng Tối, Ánh Sáng  
-**[★] Gene System** → Tăng chỉ số theo gen  
-**[★] Evolution** → Pet lên cấp để tiến hóa  
-**[★] PvP Mode** → Đấu 1v1 giữa người chơi  
-
-
-✧･ﾟ:* ✧･ﾟ:* ♡ CÁCH CHƠI CHO NGƯỜI MỚI ♡ *:･ﾟ✧*:･ﾟ✧
-
-🐣 **Bước 1 → Gọi pet rừng**  
-\`\`\`
-/pet spawn
-\`\`\`
-
-🪄 **Bước 2 → Bắt pet**  
-Dùng Capsule để bắt:  
-\`\`\`
-/pet catch
-\`\`\`
-
-📘 **Bước 3 → Kiểm tra pet vừa bắt**  
-\`\`\`
-/pet info
-\`\`\`
-
-🌱 **Bước 4 → Train và nâng cấp**  
-\`\`\`
-/pet upgrade
-\`\`\`
-
-⚔️ **Bước 5 → Đặt pet chiến đấu chính**  
-\`\`\`
-/pet team
-\`\`\`
-
-🎮 **Bước 6 → PvP cùng bạn bè!**  
-\`\`\`
-/pet pvp @User
-\`\`\`
-
-💡 **TIP quan trọng:**  
-• Dùng pet hệ khắc chế để thắng dễ hơn  
-• Gen cao → damage mạnh  
-• Pet hiếm → nhiều skill hơn  
-• Đừng quên mở túi để xem pet hiếm mới bắt được  
-
-
-˚₊·͟͟͟͟͟➳❥ Ví dụ sử dụng ˚₊·͟͟͟͟͟➳❥
-╔═══════════════════════════════════╗
-║             💫 VÍ DỤ 💫           ║
-╚═══════════════════════════════════╝
-
-🐾 **Bắt pet rừng**  
-\`\`\`
-/pet spawn
-/pet catch
-\`\`\`
-
-🐾 **Xem pet của bạn**  
-\`\`\`
-/pet info
-/pet inventory
-\`\`\`
-
-🐾 **Nâng cấp & tiến hóa**  
-\`\`\`
-/pet upgrade
-\`\`\`
-
-🐾 **Thách PvP**  
-\`\`\`
-/pet pvp @User
-\`\`\`
-
-
-✧｡٩(ˊᗜˋ)و✧｡ Mẹo hay & Tricks ✧｡٩(ˊᗜˋ)و✧｡
-
-🌿 Dùng pet hệ khắc chế để thắng PvP  
-🔥 Lên cấp tăng mạnh stats và mở skill mới  
-⚡ Pet càng hiếm → chỉ số càng cao  
-💎 Gen cao → damage lớn và nhiều hiệu ứng hơn  
-🎯 Mỗi pet có set skill riêng biệt  
-📦 Kiểm tra túi để không bỏ sót pet hiếm  
-
-
-
-⋆౨ৎ˚⟡˖ ࣪ Guidelines & Rules ⋆౨ৎ˚⟡˖ ࣪
-
-+ ⚔️ Không spam bắt pet  
-+ 🎮 Không dùng bug để farm  
-+ 💕 Tôn trọng người chơi khác  
-+ 📜 Tuân thủ luật server  
-
-         ♡ ENJOY THE GAME ♡
-`);
+`)
+    .addFields(
+        {
+            name: "◆ ━━━━━━ ◦ ❖ ◦ ━━━━━━ ◆ LỆNH CHÍNH ◆ ━━━━━━ ◦ ❖ ◦ ━━━━━━ ◆",
+            value: `
+            **[🎒] /inventory**  → Quản lý Pet (chọn Đồng Hành, Cho Ăn, nâng Stats).
+            **[⚔️] /adventure**  → Bắt đầu trận đấu Dungeons/Boss (Farm EXP).
+            **[🥊] /pvp**         → Thách đấu người chơi khác (dùng Pet Đồng Hành).
+            **[⚙️] /setup_spawn** → Cài đặt kênh xuất hiện Pet ngẫu nhiên (Admin).
+            **[📜] /pet help**   → Hiện hướng dẫn này.
+            `,
+            inline: false
+        },
+        {
+            name: "✧･ﾟ: ✧･ﾟ: ♡ HỆ THỐNG CỐT LÕI ♡ :･ﾟ✧:･ﾟ✧",
+            value: `
+            **[🌟] Wild Pet System**  → Pet xuất hiện ngẫu nhiên.
+            **[💎] Capture System**  → Bắt Pet sau khi chiến thắng trận đấu.
+            **[🧬] Gene System**      → Ảnh hưởng trực tiếp đến chỉ số Pet (ATK, DEF, SPD...).
+            **[💧🔥🌿] Elements**    → 6 hệ nguyên tố khắc chế, yêu cầu chiến thuật.
+            **[🔄] Evolution**       → Pet lên cấp để tiến hóa và mở khóa kỹ năng mới.
+            `,
+            inline: false
+        },
+        {
+            name: "⚔️ VÍ DỤ & HƯỚNG DẪN CHƠI ⚔️",
+            value: `
+            **1️⃣ Thu thập & Chọn Đồng Hành:** - Chờ Pet Wild Spawn hoặc dùng lệnh Starter.
+            - Chọn Pet chính trong \`/inventory\`.
+            
+            **2️⃣ Huấn Luyện:**
+            - Dùng \`/inventory\` để **Cho Ăn** (tăng XP) và **Nâng Cấp** (cộng điểm tiềm năng).
+            
+            **3️⃣ Chiến Đấu:**
+            - Đánh Boss/Dungeons: \` /adventure \`
+            - Thách đấu PvP: \` /pvp @User \`
+            `,
+            inline: false
+        },
+        {
+            name: "✨ TIP QUAN TRỌNG ✨",
+            value: `
+            • Gen cao và Pet hiếm có chỉ số mạnh mẽ hơn.
+            • Hồi phục HP/MP cho Pet trong \`/inventory\` bằng Thuốc Hồi Phục.
+            • Tận dụng hệ khắc chế trong PvP để thắng dễ dàng.
+            `,
+            inline: false
+        }
+    )
+    .setFooter({ text: "⋆౨ৎ˚⟡˖ ࣪ Enjoy the game! ⋆౨ৎ˚⟡˖ ࣪" });
 
     await interaction.reply({ embeds: [embed] });
   },
