@@ -1,5 +1,5 @@
 // File: Constants.mjs (FINAL VERSION - Bổ sung Phần thưởng)
-
+import { ButtonStyle } from 'discord.js';
 // === 1. EMOJIS & COLORS ===
 export const EMOJIS = {
     PET_ICONS: [
@@ -21,9 +21,20 @@ export const EMOJIS = {
     HEART: '❤️',
     MANA: '💧',
     SPEED: '⚡',
-    STAR: '⭐'
+    STAR: '⭐',
+    BALL_POKE: '<:PokeF_Ball:1441656965410455645>',
+    BALL_GREAT: '<:Great_Ball:1441657002802544752>',
+    BALL_ULTRA: '<:Ultra_Ball:1441657071878799482>',
+    BALL_DUSK: '<:Dusk_Ball:1441657029075664998>',
+    BALL_MASTER: '<a:Master:1441451727348830460>'
 };
-
+export const POKEBALLS = {
+    'poke':   { name: 'Poké Ball', multiplier: 1.0, icon: EMOJIS.BALL_POKE, style: ButtonStyle.Primary },
+    'great':  { name: 'Great Ball', multiplier: 1.5, icon: EMOJIS.BALL_GREAT, style: ButtonStyle.Primary },
+    'ultra':  { name: 'Ultra Ball', multiplier: 2.0, icon: EMOJIS.BALL_ULTRA, style: ButtonStyle.Primary },
+    'dusk':   { name: 'Dusk Ball', multiplier: 2.5, icon: EMOJIS.BALL_DUSK, style: ButtonStyle.Secondary, special: { element: 'Dark' } },
+    'master': { name: 'Master Ball', multiplier: 999.0, icon: EMOJIS.BALL_MASTER, style: ButtonStyle.Danger }
+};
 export const RARITY_COLORS = {
     'Common': 0x808080, 'Uncommon': 0x00FF00, 'Rare': 0x0099FF,
     'Epic': 0x9900FF, 'Legendary': 0xFFD700, 'Mythic': 0xFF0000

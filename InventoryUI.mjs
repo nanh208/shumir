@@ -15,9 +15,10 @@ import {
     EMOJIS, 
     RARITY_COLORS, 
     RARITY_CONFIG, 
-    CANDIES, // Đã bao gồm ULTRA
+    CANDIES, 
     ELEMENT_ICONS,
-    SKILLBOOK_CONFIG 
+    SKILLBOOK_CONFIG,
+    POKEBALLS 
 } from './Constants.mjs';
 
 const ITEMS_PER_PAGE = 5; 
@@ -46,11 +47,11 @@ async function safeUpdate(interaction, payload) {
         // Xử lý lỗi 10062 (Unknown interaction) và InteractionNotReplied
         if (e.code === 10062 || e.code === 'InteractionNotReplied') {
              await interaction.followUp({ 
-                content: "⚠️ Phiên giao diện đã hết hạn (15 phút). Vui lòng sử dụng lệnh `/inventory` để mở lại.", 
-                embeds: payload.embeds, 
-                components: payload.components, 
-                ephemeral: true 
-            }).catch(() => {});
+                 content: "⚠️ Phiên giao diện đã hết hạn (15 phút). Vui lòng sử dụng lệnh `/inventory` để mở lại.", 
+                 embeds: payload.embeds, 
+                 components: payload.components, 
+                 ephemeral: true 
+             }).catch(() => {});
         } else {
             console.error(`Lỗi cập nhật UI: ${e.message}`);
         }
@@ -58,7 +59,7 @@ async function safeUpdate(interaction, payload) {
 }
 
 // ==========================================
-// 1. GIAO DIỆN CHÍNH: TÚI ĐỒ & KHO PET (ĐÃ CẬP NHẬT CANDY)
+// 1. GIAO DIỆN CHÍNH: TÚI ĐỒ & KHO PET (ĐÃ SỬA LỖI KEY)
 // ==========================================
 
 export async function showInventory(interaction, page = 0) {
@@ -68,24 +69,43 @@ export async function showInventory(interaction, page = 0) {
     
     if (userData.activePetIndex === undefined) userData.activePetIndex = 0;
 
-    if (!userData.inventory) userData.inventory = { candies: {}, skillbooks: {}, crates: {} };
+    // [ĐÃ SỬA] Khởi tạo .pokeballs (dùng đúng key đã log)
+    if (!userData.inventory) userData.inventory = { candies: {}, skillbooks: {}, crates: {}, potions: 0 };
+    if (!userData.inventory.pokeballs) userData.inventory.pokeballs = {}; // Dùng 'pokeballs'
+    
     const inv = userData.inventory;
     const pets = userData.pets || [];
 
     // --- TẠO NỘI DUNG EMBED (ITEM LIST) ---
     let itemDesc = `**${EMOJIS.STAR} VẬT PHẨM TIÊU THỤ:**\n`;
     
+    // 1. Candies
     const candyKeys = Object.keys(CANDIES);
     let hasCandy = false;
     
     candyKeys.forEach(key => {
         const cfg = CANDIES[key];
-        const qty = inv.candies[key.toLowerCase()] || 0; // Đảm bảo key inventory là chữ thường
+        const qty = inv.candies[key.toLowerCase()] || 0;
         if (qty > 0) { itemDesc += `${cfg.emoji} **${cfg.name}**: \`${qty}\`\n`; hasCandy = true; }
     });
 
     if (!hasCandy) itemDesc += "*Không có kẹo nào.*\n";
     itemDesc += `\n**${EMOJIS.BOX_COMMON} VẬT PHẨM KHÁC:**\n💊 Thuốc Hồi Phục: \`${inv.potions || 0}\`\n`;
+    
+    // 2. [CẬP NHẬT] Balls - SỬ DỤNG inv.pokeballs
+    itemDesc += `\n**${EMOJIS.BALL_MASTER} BÓNG THU PHỤC:**\n`;
+    let hasBalls = false;
+    
+    for (const key in POKEBALLS) {
+        const ball = POKEBALLS[key];
+        const qty = inv.pokeballs?.[key] || 0; // <--- ĐỌC TỪ inv.pokeballs
+        if (qty > 0) {
+            itemDesc += `${ball.icon} **${ball.name}**: \`${qty}\`\n`;
+            hasBalls = true;
+        }
+    }
+    if (!hasBalls) itemDesc += "*Không có bóng nào.*\n";
+
 
     // --- TẠO NỘI DUNG EMBED (PET LIST) ---
     const totalPages = Math.ceil(pets.length / ITEMS_PER_PAGE);
@@ -345,7 +365,7 @@ export async function handleEquipPet(interaction, petIndex) {
     await showPetDetails(interaction, petIndex);
 }
 
-// Xử lý cho ăn (ĐÃ CẬP NHẬT LOGIC CANDY)
+// Xử lý cho ăn
 export async function handleFeed(interaction, petIndex, candyType) {
     await interaction.deferUpdate();
 
@@ -358,7 +378,7 @@ export async function handleFeed(interaction, petIndex, candyType) {
     const candyCfg = CANDIES[candyKey];
 
     // Kiểm tra kho dựa trên key chữ thường
-    if (!userData.inventory.candies[candyType]) {
+    if (!userData.inventory.candies[candyType] || userData.inventory.candies[candyType] <= 0) {
         return interaction.followUp({ content: `🚫 Hết ${candyCfg?.name || 'kẹo'}!`, flags: [MessageFlags.Ephemeral] });
     }
 

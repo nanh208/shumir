@@ -21,7 +21,7 @@
         "xp": 0,
         "gen": 100,
         "statPoints": 0,
-        "currentHP": 577707,
+        "currentHP": 577900,
         "currentMP": 270700,
         "skills": [
           "S1",
@@ -31,39 +31,46 @@
         ],
         "activeEffects": [
           {
-            "name": "Sương Giá II",
+            "name": "Ám Ảnh V",
             "stat": "ATK",
-            "value": -0.1,
+            "value": -0.4,
             "type": "debuff",
-            "turns": 2
+            "turns": 0
           },
           {
-            "name": "Sương Giá II",
+            "name": "Ám Ảnh V",
             "stat": "ATK",
-            "value": -0.1,
+            "value": -0.4,
             "type": "debuff",
-            "turns": 2
+            "turns": 0
           },
           {
-            "name": "Sương Giá II",
-            "stat": "ATK",
-            "value": -0.1,
-            "type": "debuff",
-            "turns": 2
+            "name": "Thiêu Đốt III",
+            "stat": "hp",
+            "value": 0.08,
+            "type": "dot",
+            "turns": 0
           },
           {
-            "name": "Sương Giá II",
-            "stat": "ATK",
-            "value": -0.1,
-            "type": "debuff",
-            "turns": 2
+            "name": "Thiêu Đốt III",
+            "stat": "hp",
+            "value": 0.08,
+            "type": "dot",
+            "turns": 1
           },
           {
-            "name": "Sương Giá II",
+            "name": "Thiêu Đốt III",
+            "stat": "hp",
+            "value": 0.08,
+            "type": "dot",
+            "turns": 1
+          },
+          {
+            "name": "Long Lực V",
             "stat": "ATK",
-            "value": -0.1,
-            "type": "debuff",
-            "turns": 3
+            "value": 0.5,
+            "type": "buff",
+            "turns": 2
           }
         ],
         "passive": "CRIT_MASTER"
@@ -131,12 +138,12 @@
     ],
     "inventory": {
       "candies": {
-        "normal": 10015,
+        "normal": 10047,
         "high": 9999,
         "super": 9999,
         "ultra": 9999
       },
-      "potions": 1007,
+      "potions": 1023,
       "crates": {
         "common": 99,
         "mythic": 99
@@ -148,7 +155,14 @@
         "lig_ulti",
         "gra_ulti",
         "ice_ulti"
-      ]
+      ],
+      "pokeballs": {
+        "poke": 999,
+        "great": 999,
+        "ultra": 999,
+        "dusk": 999,
+        "master": 999
+      }
     },
     "gold": 9999999,
     "codesRedeemed": [],

@@ -10,7 +10,8 @@ import { activeWildPets } from './SpawnSystem.mjs';
 import { Database } from './Database.mjs';
 import { Pet, calculateDamage, processSkillEffect, createBossPet } from './GameLogic.mjs'; 
 import { getSkillById } from './SkillList.mjs'; 
-import { ELEMENT_ICONS, RARITY_COLORS } from './Constants.mjs';
+// Đã thêm POKEBALLS vào import
+import { ELEMENT_ICONS, RARITY_COLORS, POKEBALLS } from './Constants.mjs'; 
 
 const PET_XP_BASE = 100;
 const DEATH_COOLDOWN = 10 * 60 * 1000; // 10 Phút
@@ -70,6 +71,13 @@ function calculateCatchRate(playerPet, wildPet) {
     const levelDiff = playerLevel - wildLevel;
     let levelBonus = Math.min(0.15, Math.max(-0.15, levelDiff * 0.01));
     let finalRate = baseRate + levelBonus;
+    
+    // Tỉ lệ bắt cũng phụ thuộc vào HP của Pet hoang dã (càng yếu càng dễ bắt)
+    const hpRatio = wildPet.currentHP / wildPet.getStats().HP;
+    let hpBonus = (1 - hpRatio) * 0.25; // Tối đa 25% bonus khi HP còn 0
+    
+    finalRate += hpBonus;
+    
     return Math.max(0.005, Math.min(1.0, finalRate));
 }
 
@@ -234,7 +242,7 @@ async function startBattleLogic(interaction, userId, userData, petIndex, type, p
 }
 
 // ==================================================================
-// 3. ROUTER XỬ LÝ TƯƠNG TÁC BUTTON (Đã FIXED Logic)
+// 3. ROUTER XỬ LÝ TƯƠNG TÁC BUTTON
 // ==================================================================
 
 export async function handleInteraction(interaction) {
@@ -273,8 +281,10 @@ export async function handleInteraction(interaction) {
             if (!interaction.deferred && !interaction.replied) await interaction.deferReply();
         } catch (e) { return; }
 
+        // [SỬA LỖI KHIÊU CHIẾN ĐÃ BỊ HẠ]
         if (!info) {
-             if (interaction.message) await interaction.message.delete().catch(() => {});
+             // Xóa nút khỏi tin nhắn gốc
+             if (interaction.message) await interaction.message.edit({ components: [] }).catch(() => {});
              return interaction.editReply({ content: "⚠️ **Mục tiêu đã biến mất hoặc bị hạ gục!**" });
         }
 
@@ -299,8 +309,8 @@ export async function handleInteraction(interaction) {
         // Defer Update cho các nút hành động PvP (skill, surrender)
         if (customId.startsWith('pvp_skill_') || customId.startsWith('pvp_surrender')) {
              try {
-                if (!interaction.deferred && !interaction.replied) await interaction.deferUpdate(); 
-            } catch(e) {}
+                 if (!interaction.deferred && !interaction.replied) await interaction.deferUpdate(); 
+             } catch(e) {}
         }
         
         const skillIndex = parseInt(customIdParts[customIdParts.length - 2]); 
@@ -320,17 +330,15 @@ export async function handleInteraction(interaction) {
     // 3. LOGIC TRONG TRẬN ĐẤU (PVE)
     const battle = activeBattles.get(uid);
     
-    // [FIXED] Defer Update cho tất cả các nút hành động trong PvE
+    // [CẬP NHẬT] Defer Update an toàn cho các nút hành động trong PvE
     try {
         if (!interaction.deferred && !interaction.replied) {
-             // Không defer update nếu là nút đã được xử lý defer bên trong (ví dụ: handlePvEEndActions)
-            if (!['btn_claim', 'btn_defeat'].includes(customId)) {
-                await interaction.deferUpdate();
-            }
+             // Lọc ra các nút BẮT PET/QUAY LẠI/CLAIM/DEFEAT/BALL_XXX để chúng được defer riêng
+             if (!['btn_claim', 'btn_defeat', 'btn_select_ball', 'btn_cancel_catch'].includes(customId) && !customId.startsWith('ball_')) {
+                 await interaction.deferUpdate();
+             }
         }
     } catch(e) {
-         // Lỗi Unknown interaction (10062) sẽ xuất hiện ở đây khi tương tác quá 15 phút.
-         // Ta thoát ngay để tránh lỗi InteractionNotReplied ở các bước sau.
          console.error(`Lỗi Defer PvE cho ${customId}:`, e.message);
          if (e.code === 10062) return; 
     }
@@ -343,7 +351,11 @@ export async function handleInteraction(interaction) {
         await processPvETurn(interaction, skillIndex, battle);
     } 
     else if (['btn_claim', 'btn_defeat'].includes(customId)) await handlePvEEndActions(interaction, customId, client); 
-    else if (customId.startsWith('btn_catch')) await handleCatchAction(interaction, battle); 
+    // ROUTING MỚI CHO HỆ THỐNG BẮT PET CHI TIẾT
+    else if (customId.startsWith('btn_select_ball')) await showCatchBallInterface(interaction, battle); // Nút kích hoạt giao diện chọn bóng
+    else if (customId.startsWith('ball_')) await handleCatchAction(interaction, battle); // Nút chọn bóng cụ thể
+    else if (customId.startsWith('btn_cancel_catch')) await showPvEInterface(interaction, uid); // Nút hủy chọn bóng
+    // END ROUTING MỚI
     else if (customId.startsWith('btn_run')) await handleRunAction(interaction, battle);
     else if (customId.startsWith('btn_heal')) await handleHealAction(interaction, battle);
     else if (customId.startsWith('btn_mana')) await handleManaAction(interaction, battle);
@@ -409,11 +421,11 @@ async function showPvEInterface(interaction, uid) {
         new ButtonBuilder().setCustomId(`btn_run_${uid}`).setLabel('🏃 Bỏ Chạy').setStyle(ButtonStyle.Danger)
     );
 
-    // ẨN NÚT BẮT NẾU LÀ BOSS
+    // THAY THẾ: Nút Bắt Pet đơn giản bằng nút kích hoạt giao diện chọn bóng
     if (battle.type === 'wild' && wildPet.rarity !== 'Boss' && wildPet.rarity !== 'RaidBoss') {
         const catchRate = calculateCatchRate(playerPet, wildPet);
         const catchBtn = new ButtonBuilder()
-            .setCustomId(`btn_catch_${uid}`)
+            .setCustomId(`btn_select_ball_${uid}`) // Nút kích hoạt giao diện chọn bóng
             .setLabel(`⭐ Bắt (${Math.round(catchRate * 100)}%)`) 
             .setStyle(ButtonStyle.Success)
             .setDisabled(wildPet.currentHP <= 0); 
@@ -434,6 +446,69 @@ async function showPvEInterface(interaction, uid) {
         console.error("Lỗi showPvEInterface:", e.message); 
     }
 }
+
+async function showCatchBallInterface(interaction, battle) {
+    const userId = interaction.user.id;
+    const userData = Database.getUser(userId);
+    const { playerPet, wildPet } = battle;
+
+    // Defer riêng cho nút này (đã loại khỏi defer chung trong handleInteraction)
+    try {
+        if (!interaction.deferred && !interaction.replied) await interaction.deferUpdate();
+    } catch (e) { return; }
+    
+    // 1. Tính Tỷ Lệ Bắt Cơ Bản
+    const baseRate = calculateCatchRate(playerPet, wildPet);
+    const embed = new EmbedBuilder().setTitle("🔴 CHỌN POKÉ BALL")
+        .setDescription(`Pet: **${wildPet.name}** (Lv.${wildPet.level}) - Tỉ lệ bắt cơ bản: **${Math.round(baseRate * 100)}%**` + 
+        `\nHP hiện tại: **${Math.max(0, wildPet.currentHP)}/${wildPet.getStats().HP}**` +
+        `\n*Chỉ số hiển thị là tỉ lệ khi dùng loại bóng đó.*`)
+        .setColor(0x0099FF);
+
+    const row = new ActionRowBuilder();
+    let hasAvailableBall = false;
+
+    // 2. Tạo nút cho từng loại bóng
+    for (const key in POKEBALLS) {
+        const ball = POKEBALLS[key];
+        // Số lượng bóng người chơi có (Lấy từ Inventory của User)
+        const count = userData.inventory.pokeballs?.[key] || 0; 
+        
+        let finalRate = baseRate * ball.multiplier;
+
+        // Áp dụng bonus đặc biệt cho Dusk Ball
+        if (key === 'dusk' && wildPet.elements.includes('Dark')) {
+            finalRate *= 1.25; 
+        }
+
+        finalRate = Math.max(0.005, Math.min(1.0, finalRate));
+
+        const btn = new ButtonBuilder()
+            .setCustomId(`ball_${key}_${userId}`) 
+            .setLabel(`${ball.icon} ${ball.name} | ${Math.round(finalRate * 100)}% [${count}]`)
+            .setStyle(ball.style)
+            .setDisabled(count <= 0 || wildPet.currentHP <= 0 || finalRate === 1.0); 
+
+        row.addComponents(btn);
+        if (count > 0) hasAvailableBall = true;
+    }
+
+    // Thêm nút Hủy/Quay lại
+    row.addComponents(new ButtonBuilder().setCustomId(`btn_cancel_catch_${userId}`).setLabel('⬅️ Quay lại').setStyle(ButtonStyle.Secondary));
+
+    // 3. Cập nhật giao diện
+    if (!hasAvailableBall && wildPet.rarity !== 'Boss') {
+        embed.setDescription("⚠️ **Bạn không có Poké Ball nào!** Vui lòng Quay lại.");
+    }
+    
+    // Sử dụng editReply vì đã deferUpdate ở trên
+    try {
+        await interaction.editReply({ embeds: [embed], components: [row] });
+    } catch(e) {
+         console.error("Lỗi showCatchBallInterface khi editReply:", e.message);
+    }
+}
+
 
 async function processPvETurn(interaction, skillIndex, battle) {
     const { playerPet, wildPet } = battle;
@@ -550,8 +625,11 @@ async function processEnemyTurn(interaction, battle) {
 }
 
 async function handleHealAction(interaction, battle) {
+    // [CẬP NHẬT] Defer Update
     const userId = interaction.user.id;
     const userData = Database.getUser(userId);
+    if (!interaction.deferred && !interaction.replied) await interaction.deferUpdate(); 
+
     if (!userData.inventory.potions) userData.inventory.potions = 5;
 
     if (userData.inventory.potions < 1) {
@@ -569,8 +647,11 @@ async function handleHealAction(interaction, battle) {
 }
 
 async function handleManaAction(interaction, battle) {
+    // [CẬP NHẬT] Defer Update
     const userId = interaction.user.id;
     const userData = Database.getUser(userId);
+    if (!interaction.deferred && !interaction.replied) await interaction.deferUpdate(); 
+    
     if (!userData.inventory.potions) userData.inventory.potions = 5;
 
     if (userData.inventory.potions < 1) {
@@ -588,7 +669,10 @@ async function handleManaAction(interaction, battle) {
 }
 
 async function handleRunAction(interaction, battle) {
+    // [CẬP NHẬT] Defer Update
     const petToClearId = battle.wildPetId; 
+    if (!interaction.deferred && !interaction.replied) await interaction.deferUpdate();
+
     if (battle.type === 'adventure' || battle.type === 'raid_boss') {
         battle.logs.push("🚫 Không thể chạy khi đánh Boss/Dungeon!");
         return showPvEInterface(interaction, interaction.user.id);
@@ -612,29 +696,58 @@ async function handleRunAction(interaction, battle) {
 async function handleCatchAction(interaction, battle) {
     const userId = interaction.user.id;
     const { playerPet, wildPet, wildPetId } = battle;
+    const customIdParts = interaction.customId.split('_');
+    const ballType = customIdParts.length > 1 && customIdParts[0] === 'ball' ? customIdParts[1] : 'poke'; 
+    const ballConfig = POKEBALLS[ballType] || POKEBALLS['poke'];
 
-    if (battle.type !== 'wild') {
-        battle.logs.push("🚫 Không thể bắt pet này.");
-        return showPvEInterface(interaction, userId);
+    // Phải deferUpdate trước khi editReply, vì đây là tương tác nút
+    try {
+        if (!interaction.deferred && !interaction.replied) await interaction.deferUpdate();
+    } catch (e) { return; }
+
+
+    if (battle.type !== 'wild' || wildPet.rarity === 'Boss' || wildPet.rarity === 'RaidBoss') {
+        battle.logs = ["🚫 **Boss quá mạnh!** Không thể thu phục."];
+        // Quay lại giao diện chiến đấu chính
+        return showPvEInterface(interaction, userId); 
     }
-
-    // CHẶN BẮT BOSS
-    if (wildPet.rarity === 'Boss' || wildPet.rarity === 'RaidBoss') {
-        battle.logs.push("🚫 **Boss quá mạnh!** Không thể thu phục.");
-        return showPvEInterface(interaction, userId);
-    }
-
+    
     const userData = Database.getUser(userId);
+    if (!userData.inventory.pokeballs) userData.inventory.pokeballs = {};
     if (!userData.pets) userData.pets = [];
+    
+    if ((userData.inventory.pokeballs[ballType] || 0) < 1) {
+        const name = ballConfig ? ballConfig.name : "Poké Ball";
+        battle.logs = [`🚫 Hết ${name}! Vui lòng chọn bóng khác.`];
+        // Quay lại giao diện chọn bóng
+        return showCatchBallInterface(interaction, battle); 
+    }
     if (userData.pets.length >= 10) {
-        battle.logs.push("🚫 Kho Pet đã đầy (Tối đa 10).");
-        await processEnemyTurn(interaction, battle);
-        return;
+        battle.logs = ["🚫 Kho Pet đã đầy (Tối đa 10)."];
+        // Quay lại giao diện chọn bóng
+        return showCatchBallInterface(interaction, battle); 
     }
 
-    const catchRate = calculateCatchRate(playerPet, wildPet);
+    // 1. TRỪ BÓNG VÀO INVENTORY
+    userData.inventory.pokeballs[ballType] -= 1; 
 
-    if (Math.random() < catchRate) {
+    // 2. TÍNH TỈ LỆ BẮT CUỐI CÙNG
+    const baseCatchRate = calculateCatchRate(playerPet, wildPet);
+    let finalCatchRate = baseCatchRate * ballConfig.multiplier;
+
+    // 3. ÁP DỤNG THƯỞNG ĐẶC BIỆT (Ví dụ: Dusk Ball cho hệ Dark)
+    if (ballType === 'dusk' && wildPet.elements.includes('Dark')) {
+        finalCatchRate *= 1.25; 
+    }
+    // Master Ball luôn bắt thành công
+    if (ballType === 'master') {
+        finalCatchRate = 1.0; 
+    }
+
+    finalCatchRate = Math.max(0.005, Math.min(1.0, finalCatchRate));
+    
+    if (Math.random() < finalCatchRate) {
+        // BẮT THÀNH CÔNG
         wildPet.ownerId = userId;
         const wildPetStats = wildPet.getStats ? wildPet.getStats() : wildPet.baseStats;
         wildPet.currentHP = wildPetStats.HP; 
@@ -643,17 +756,23 @@ async function handleCatchAction(interaction, battle) {
         const petToSave = wildPet.getDataForSave ? wildPet.getDataForSave() : wildPet;
         Database.addPetToUser(userId, petToSave);
         
-        battle.logs = [`🎉 **BẮT THÀNH CÔNG!** (${Math.round(catchRate * 100)}%) ${wildPet.name} đã được thêm vào kho. Trận đấu kết thúc.`];
+        battle.logs = [`🎉 **BẮT THÀNH CÔNG!** (${ballConfig.name} - ${Math.round(finalCatchRate * 100)}%) ${wildPet.name} đã được thêm vào kho.`];
         
         activeBattles.delete(userId);
         if (wildPetId) removePetFromWorld(wildPetId, interaction.client);
         
+        Database.updateUser(userId, userData); // Cập nhật sau khi trừ bóng
         await interaction.editReply({ content: battle.logs.join('\n'), embeds: [], components: [] });
     } else {
-        battle.logs = [`💢 **BẮT TRƯỢT!** (${Math.round(catchRate * 100)}%)`];
+        // BẮT TRƯỢT
+        battle.logs = [`💢 **BẮT TRƯỢT!** (${ballConfig.name} - ${Math.round(finalCatchRate * 100)}%)`];
+        
+        Database.updateUser(userId, userData); // Cập nhật sau khi trừ bóng
+        // Sau khi bắt trượt, đến lượt Pet địch tấn công
         await processEnemyTurn(interaction, battle);
     }
 }
+
 
 async function showPvEVictory(interaction, battle) {
     const { playerPet, wildPet, type, wildPetId } = battle;
@@ -694,16 +813,15 @@ async function showPvEVictory(interaction, battle) {
         row.addComponents(new ButtonBuilder().setCustomId('btn_claim').setLabel('Xong').setStyle(ButtonStyle.Primary));
     }
     
-    // [FIXED]: Xử lý lỗi InteractionNotReplied (40060) và Unknown Interaction (10062) tiềm ẩn
+    // [FIXED] Xử lý lỗi InteractionNotReplied an toàn (rất quan trọng)
     try {
         await interaction.editReply({ embeds: [embed], components: [row] });
     } catch (e) {
-        // Nếu lỗi do hết hạn hoặc không defer kịp (InteractionNotReplied/10062)
         if (e.code === 'InteractionNotReplied' || e.code === 10062) {
              await interaction.followUp({ 
-                content: `🏆 **CHIẾN THẮNG!** Tin nhắn cũ không thể cập nhật (Đã hết hạn).`, 
-                embeds: [embed], components: [row], flags: [MessageFlags.Ephemeral] 
-            }).catch(() => {});
+                 content: `🏆 **CHIẾN THẮNG!** Tin nhắn cũ không thể cập nhật (Đã hết hạn).`, 
+                 embeds: [embed], components: [row], flags: [MessageFlags.Ephemeral] 
+             }).catch(() => {});
         } else {
             console.error("Lỗi showPvEVictory:", e.message);
         }
@@ -768,7 +886,7 @@ async function startPvPMatch(interaction, cid) {
     const { challenger, opponent } = pendingChallenges.get(cid);
     pendingChallenges.delete(cid);
     
-     // [FIXED] Defer lại tương tác Accept để có thể Edit tin nhắn
+      // [FIXED] Defer lại tương tác Accept để có thể Edit tin nhắn
     try {
         if (!interaction.deferred && !interaction.replied) await interaction.deferUpdate();
     } catch(e) {}

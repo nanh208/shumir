@@ -1,36 +1,37 @@
 import fs from 'fs';
 import path from 'path';
 
-const DATA_DIR = path.resolve(process.cwd(), 'data'); // Đảm bảo đường dẫn tuyệt đối cho ổn định
+const DATA_DIR = path.resolve(process.cwd(), 'data'); 
 const USER_FILE = path.join(DATA_DIR, 'users.json');
 const MARKET_FILE = path.join(DATA_DIR, 'market.json');
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
-const SERVERS_FILE = path.join(DATA_DIR, 'servers.json'); // [MỚI] File lưu cấu hình Server
+const SERVERS_FILE = path.join(DATA_DIR, 'servers.json'); 
 
 // Cấu trúc dữ liệu mặc định
 const DEFAULT_USER_DATA = {
     pets: [],
     inventory: {
-        candies: { normal: 0, high: 0, super: 0, ultra: 0 }, // ĐÃ CẬP NHẬT: Thêm ULTRA
+        candies: { normal: 0, high: 0, super: 0, ultra: 0 }, 
         potions: 0, 
         crates: { common: 0, mythic: 0 },
-        skillBooks: []
+        skillBooks: [],
+        pokeballs: { poke: 0, great: 0, ultra: 0, dusk: 0, master: 0 } // ĐÃ SỬA: Pokeballs mặc định
     },
     gold: 1000,
     codesRedeemed: [],
     hasClaimedStarter: false,
-    activePetIndex: 0, // ĐÃ CẬP NHẬT: Vị trí Pet đồng hành
+    activePetIndex: 0,
     createdAt: 0
 };
 
-// [CẬP NHẬT CHO ARENA]
+// Cấu hình Server mặc định
 const DEFAULT_SERVER_CONFIG = {
     spawnChannelId: null,
-    arenaChannelId: null, // [MỚI] ID kênh đấu trường
-    difficulty: 'dễ' // Mặc định độ khó cho Server
+    arenaChannelId: null,
+    difficulty: 'dễ'
 };
 
-// --- HÀM HỖ TRỢ ĐỌC/GHI (SỬ DỤNG LẠI TỪ CODE TRƯỚC) ---
+// --- HÀM HỖ TRỢ ĐỌC/GHI ---
 
 const ensureDbFile = (filePath, defaultData = {}) => {
     if (!fs.existsSync(filePath)) {
@@ -60,7 +61,7 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 ensureDbFile(USER_FILE, {});
 ensureDbFile(MARKET_FILE, []);
 ensureDbFile(CONFIG_FILE, { spawnChannelId: null });
-ensureDbFile(SERVERS_FILE, {}); // Khởi tạo file Server
+ensureDbFile(SERVERS_FILE, {}); 
 
 // ==========================================
 // Bắt đầu Class Database
@@ -82,18 +83,38 @@ export class Database {
         let needsSave = false;
         
         if (!allData[userId]) {
+            // User mới: Khởi tạo với DEFAULT_USER_DATA
             allData[userId] = JSON.parse(JSON.stringify(DEFAULT_USER_DATA));
             allData[userId].createdAt = Date.now();
             needsSave = true;
         }
         
-        // --- Migration & Cleanup ---
+        // --- Migration & Cleanup cho User cũ ---
         const user = allData[userId];
 
-        // Đảm bảo các fields quan trọng từ cấu trúc mới tồn tại (Migration)
-        if (!user.inventory.candies.ultra) { user.inventory.candies.ultra = 0; needsSave = true; }
+        // Migration 1: Đảm bảo các fields Candy/Inventory tồn tại
+        if (!user.inventory || !user.inventory.candies) {
+             user.inventory = { ...DEFAULT_USER_DATA.inventory, ...user.inventory };
+             needsSave = true;
+        }
+        if (user.inventory.candies.ultra === undefined) { user.inventory.candies.ultra = 0; needsSave = true; }
+        
+        // Migration 2: Đảm bảo trường Pokeballs tồn tại và có đủ key
+        if (!user.inventory.pokeballs) {
+            user.inventory.pokeballs = JSON.parse(JSON.stringify(DEFAULT_USER_DATA.inventory.pokeballs));
+            needsSave = true;
+        } else {
+            // Đảm bảo user cũ có đủ các loại bóng
+            for (const key in DEFAULT_USER_DATA.inventory.pokeballs) {
+                if (user.inventory.pokeballs[key] === undefined) {
+                    user.inventory.pokeballs[key] = DEFAULT_USER_DATA.inventory.pokeballs[key];
+                    needsSave = true;
+                }
+            }
+        }
+        
+        // Migration 3: Đảm bảo activePetIndex tồn tại
         if (user.activePetIndex === undefined) { user.activePetIndex = 0; needsSave = true; } 
-        // ... (Giữ lại các migration logic khác nếu cần) ...
         
         if (needsSave) this.saveAllUserData(allData);
         
@@ -136,18 +157,15 @@ export class Database {
         this.saveMarket(market);
     }
 
-    // --- [CẬP NHẬT] SERVER CONFIGURATION ---
+    // --- SERVER CONFIGURATION ---
 
     /**
      * Lấy cấu hình của Server theo ID.
-     * Tự động gộp với DEFAULT để đảm bảo có field arenaChannelId
      */
     static getServerConfig(serverId) {
         const servers = readJson(SERVERS_FILE);
         const serverData = servers[serverId] || {};
         
-        // [QUAN TRỌNG] Spread operator giúp gộp cấu hình hiện có với mặc định
-        // Nếu server cũ chưa có 'arenaChannelId', nó sẽ lấy từ DEFAULT
         return { ...DEFAULT_SERVER_CONFIG, ...serverData };
     }
 
@@ -160,12 +178,10 @@ export class Database {
         writeJson(SERVERS_FILE, servers);
     }
 
-    // --- [MỚI] CÁC HÀM CHO ARENA ---
+    // --- CÁC HÀM CHO ARENA ---
 
     /**
      * Thiết lập kênh đấu trường cho server
-     * @param {string} serverId 
-     * @param {string} channelId 
      */
     static setArenaChannel(serverId, channelId) {
         const config = this.getServerConfig(serverId);
@@ -175,8 +191,6 @@ export class Database {
 
     /**
      * Lấy ID kênh đấu trường hiện tại
-     * @param {string} serverId 
-     * @returns {string|null}
      */
     static getArenaChannel(serverId) {
         const config = this.getServerConfig(serverId);
@@ -190,9 +204,8 @@ export class Database {
 
     static setSpawnChannel(channelId) {
         const config = this.getConfig();
-        // [Lưu ý]: Nếu bạn muốn lưu spawnChannelId vào ServerConfig, bạn cần sửa hàm này.
-        // Hiện tại: Vẫn lưu vào CONFIG_FILE (Global)
         config.spawnChannelId = channelId;
         writeJson(CONFIG_FILE, config);
     }
+    
 }
