@@ -1,4 +1,4 @@
-// index.js — Shumir Bot (FIXED & UPDATED)
+// index.js — Shumir Bot (UPDATED FOR NEW BATTLE SYSTEM)
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
@@ -43,23 +43,27 @@ try {
 // --- Pet Game (Dynamic Import cho ES Modules) ---
 let SpawnModule, BattleModule, CommandModule, StarterPetModule, InventoryModule, DatabaseModule;
 let spawner;
-let SpawnSystem, handleBattle, handleSlashCommand, handleButtons, setSpawnSystemRef, handleStarterCommand, handleInventoryInteraction, Database;
+let SpawnSystem, handleBattle, handleSlashCommand, handleButtons, setSpawnSystemRef, setRaidManagerRef, handleStarterCommand, handleInventoryInteraction, Database;
 
 // Hàm nạp module không đồng bộ (Async Loader)
 async function loadGameModules() {
     try {
-        // [QUAN TRỌNG] Import Database để dùng cho lệnh Arena/Server Config
+        // [QUAN TRỌNG] Import Database
         DatabaseModule = await import("./Database.mjs");
         Database = DatabaseModule.Database;
 
         SpawnModule = await import("./SpawnSystem.mjs");
-        BattleModule = await import("./BattleManager.mjs");
+        BattleModule = await import("./BattleManager.mjs"); // File quản lý chiến đấu chính
         CommandModule = await import("./CommandHandlers.mjs");
         StarterPetModule = await import("./StarterPet.mjs");
         InventoryModule = await import("./InventoryUI.mjs");
 
         SpawnSystem = SpawnModule.SpawnSystem;
-        handleBattle = BattleModule.handleInteraction;
+        
+        // 👇 CẬP NHẬT MỚI: Lấy hàm xử lý từ BattleManager mới
+        handleBattle = BattleModule.handleInteraction; 
+        setRaidManagerRef = BattleModule.setRaidManagerRef; // Hàm này giờ nằm ở BattleManager
+        
         handleSlashCommand = CommandModule.handleSlashCommand;
         handleButtons = CommandModule.handleButtons;
         setSpawnSystemRef = CommandModule.setSpawnSystemRef;
@@ -165,32 +169,30 @@ client.once(Events.ClientReady, async () => {
     
     if (SpawnSystem) {
         spawner = new SpawnSystem(client); 
-        if (BattleModule && BattleModule.setRaidManagerRef) {
-            BattleModule.setRaidManagerRef(spawner.raidManager);
+        // 👇 CẬP NHẬT: Gửi RaidManager vào BattleManager để hệ thống chiến đấu nhận diện Boss
+        if (setRaidManagerRef) {
+            setRaidManagerRef(spawner.raidManager);
         }
         spawner.start(); 
     }
 });
 
 
-// ====== 6. INTERACTION HANDLER (ĐÃ SỬA LỖI VÀ GỘP LỆNH) ======
-client.on("interactionCreate", async (interaction) => { // <--- ĐÃ CÓ ASYNC
+// ====== 6. INTERACTION HANDLER ======
+client.on("interactionCreate", async (interaction) => { 
     try {
         const { customId, commandName } = interaction;
 
         // --- SLASH COMMAND ---
         if (interaction.isChatInputCommand()) {
             
-            // ============ 1. XỬ LÝ LỆNH ARENA & CONFIG (Đã chuyển vào trong) ============
+            // ============ XỬ LÝ LỆNH CONFIG ============
             if (commandName === 'arena') {
                 const channel = interaction.options.getChannel('channel');
                 const serverId = interaction.guildId;
-
-                // Kiểm tra quyền
                 if (!interaction.member.permissions.has('ManageChannels')) {
                     return interaction.reply({ content: "🚫 Bạn không có quyền quản lý kênh!", ephemeral: true });
                 }
-
                 if (Database) {
                     try {
                         Database.setArenaChannel(serverId, channel.id);
@@ -200,19 +202,17 @@ client.on("interactionCreate", async (interaction) => { // <--- ĐÃ CÓ ASYNC
                         await interaction.reply({ content: "❌ Có lỗi khi lưu dữ liệu.", ephemeral: true });
                     }
                 } else {
-                     await interaction.reply({ content: "❌ Database chưa sẵn sàng. Vui lòng thử lại sau vài giây.", ephemeral: true });
+                     await interaction.reply({ content: "❌ Database chưa sẵn sàng.", ephemeral: true });
                 }
-                return; // Kết thúc xử lý lệnh này
+                return; 
             }
 
             if (commandName === 'lvsv') {
                 const difficulty = interaction.options.getString('độ_khó');
                 const serverId = interaction.guildId;
-
                 if (!interaction.member.permissions.has('ManageGuild')) {
                     return interaction.reply({ content: "🚫 Bạn không có quyền quản lý Server!", ephemeral: true });
                 }
-
                 if (Database) {
                     const config = Database.getServerConfig(serverId);
                     config.difficulty = difficulty;
@@ -236,13 +236,12 @@ client.on("interactionCreate", async (interaction) => { // <--- ĐÃ CÓ ASYNC
                  if (sub === 'random') {
                      if (handleStarterCommand) return handleStarterCommand(interaction);
                  }
-                 // Chuyển các lệnh con khác sang handleSlashCommand nếu cần
                  else if (['info', 'list', 'help', 'evolve', 'gacha'].includes(sub)) {
                      if (handleSlashCommand) return handleSlashCommand(interaction);
                  }
             }
 
-            // 3. Định tuyến commands game khác (cũ)
+            // 3. Định tuyến commands game khác
             const command = client.commands.get(commandName);
             if (!command) return;
             return command.execute(interaction, client, wordGameStates, activeWerewolfGames, activeMonopolyGames);
@@ -250,8 +249,14 @@ client.on("interactionCreate", async (interaction) => { // <--- ĐÃ CÓ ASYNC
 
         // --- BUTTON & SELECT MENU ---
 
-        // 1. Pet Game - Battle & Skills
-        if (customId?.startsWith("challenge_") || customId?.startsWith("use_skill_") || customId?.startsWith("btn_") || customId?.startsWith("pvp_")) {
+        // 1. Pet Game - Battle, Skills & CATCH SYSTEM (QUAN TRỌNG)
+        // 👇 CẬP NHẬT: Đã thêm customId.startsWith("ball_") để bắt sự kiện chọn bóng
+        if (customId?.startsWith("challenge_") || 
+            customId?.startsWith("use_skill_") || 
+            customId?.startsWith("btn_") || 
+            customId?.startsWith("pvp_") ||
+            customId?.startsWith("ball_")) { // <--- MỚI
+            
             if (handleBattle) return handleBattle(interaction); 
         }
 
@@ -302,20 +307,13 @@ client.login(token).catch(err => {
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-    console.error('⚠️ Unhandled Rejection:', reason);
-    
+    console.log('⚠️ Lỗi chưa được xử lý (Unhandled Rejection):', reason);
 });
+
 client.on('error', (error) => {
     console.error('❌ Discord Client Error:', error);
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-    // Lỗi này thường do Promise bị reject mà không có .catch()
-    // Chúng ta log ra để biết nhưng không để bot tắt
-    console.log('⚠️ Lỗi chưa được xử lý (Unhandled Rejection):', reason);
-});
-
 process.on('uncaughtException', (err) => {
     console.error('💀 Lỗi nghiêm trọng (Uncaught Exception):', err);
-    // Có thể process.exit(1) nếu cần, nhưng để bot chạy tiếp thì cứ log ra thôi
 });

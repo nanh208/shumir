@@ -138,12 +138,12 @@
     ],
     "inventory": {
       "candies": {
-        "normal": 10047,
+        "normal": 10069,
         "high": 9999,
         "super": 9999,
         "ultra": 9999
       },
-      "potions": 1023,
+      "potions": 1024,
       "crates": {
         "common": 99,
         "mythic": 99
@@ -189,10 +189,10 @@
           "SPD": 1200
         },
         "level": 95,
-        "xp": 2530,
+        "xp": 3080,
         "gen": 98,
         "statPoints": 0,
-        "currentHP": 273120,
+        "currentHP": 273116,
         "currentMP": 115776,
         "skills": [
           "S1",
@@ -296,7 +296,7 @@
     ],
     "inventory": {
       "candies": {
-        "normal": 10009,
+        "normal": 10011,
         "high": 9999,
         "super": 9999,
         "ultra": 9999
@@ -313,7 +313,14 @@
         "lig_ulti",
         "fir_ulti",
         "dra_ulti"
-      ]
+      ],
+      "pokeballs": {
+        "poke": 0,
+        "great": 0,
+        "ultra": 0,
+        "dusk": 0,
+        "master": 0
+      }
     },
     "gold": 9999999,
     "codesRedeemed": [],
