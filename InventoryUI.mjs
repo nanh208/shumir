@@ -34,6 +34,29 @@ function createProgressBar(current, max, totalChars = 10) {
     return '🟦'.repeat(filled) + '⬜'.repeat(empty); 
 }
 
+// Hàm xử lý lỗi chung khi tương tác hết hạn
+async function safeUpdate(interaction, payload) {
+    try {
+        if (interaction.deferred || interaction.replied) {
+            await interaction.editReply(payload);
+        } else {
+            await interaction.update(payload);
+        }
+    } catch (e) {
+        // Xử lý lỗi 10062 (Unknown interaction) và InteractionNotReplied
+        if (e.code === 10062 || e.code === 'InteractionNotReplied') {
+             await interaction.followUp({ 
+                content: "⚠️ Phiên giao diện đã hết hạn (15 phút). Vui lòng sử dụng lệnh `/inventory` để mở lại.", 
+                embeds: payload.embeds, 
+                components: payload.components, 
+                ephemeral: true 
+            }).catch(() => {});
+        } else {
+            console.error(`Lỗi cập nhật UI: ${e.message}`);
+        }
+    }
+}
+
 // ==========================================
 // 1. GIAO DIỆN CHÍNH: TÚI ĐỒ & KHO PET (ĐÃ CẬP NHẬT CANDY)
 // ==========================================
@@ -52,7 +75,6 @@ export async function showInventory(interaction, page = 0) {
     // --- TẠO NỘI DUNG EMBED (ITEM LIST) ---
     let itemDesc = `**${EMOJIS.STAR} VẬT PHẨM TIÊU THỤ:**\n`;
     
-    // [CẬP NHẬT]: Duyệt qua tất cả loại kẹo từ Constants
     const candyKeys = Object.keys(CANDIES);
     let hasCandy = false;
     
@@ -152,19 +174,8 @@ export async function showInventory(interaction, page = 0) {
         return;
     }
 
-    try {
-        if (interaction.isButton && interaction.isButton()) {
-            await interaction.update(payload).catch(() => interaction.editReply(payload));
-        } else {
-            if (!interaction.deferred && !interaction.replied) {
-                await interaction.reply(payload);
-            } else {
-                await interaction.editReply(payload);
-            }
-        }
-    } catch (e) {
-        console.log("⚠️ Ignore inventory update error:", e.message);
-    }
+    // Logic cho Nút Bấm (Xử lý khi ở trong DM, nơi lỗi 10062 thường xảy ra)
+    await safeUpdate(interaction, payload);
 }
 
 // ==========================================
@@ -219,13 +230,7 @@ export async function showPetDetails(interaction, petIndex) {
 
     const payload = { content: null, embeds: [embed], components: [rowActions, rowBack] };
     
-    try {
-        if (interaction.deferred || interaction.replied) {
-            await interaction.editReply(payload);
-        } else {
-            await interaction.update(payload);
-        }
-    } catch (e) { console.log(e); }
+    await safeUpdate(interaction, payload);
 }
 
 // ==========================================
@@ -246,7 +251,6 @@ export async function showFeedMenu(interaction, petIndex) {
 
     const rowCandies = new ActionRowBuilder();
     
-    // [CẬP NHẬT]: Duyệt qua tất cả các loại kẹo có trong Constants để tạo Fields và Buttons
     const candyKeys = Object.keys(CANDIES);
     
     candyKeys.forEach(key => {
@@ -274,13 +278,7 @@ export async function showFeedMenu(interaction, petIndex) {
     const rowBack = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`inv_show_details_${petIndex}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary));
 
     const payload = { embeds: [embed], components: [rowCandies, rowBack] };
-    try {
-        if (interaction.deferred || interaction.replied) {
-            await interaction.editReply(payload);
-        } else {
-            await interaction.update(payload);
-        }
-    } catch (e) { console.log(e); }
+    await safeUpdate(interaction, payload);
 }
 
 export async function showStatUpgradeMenu(interaction, petIndex) {
@@ -309,13 +307,7 @@ export async function showStatUpgradeMenu(interaction, petIndex) {
     const rowBack = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`inv_show_details_${petIndex}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary));
 
     const payload = { embeds: [embed], components: [rowStats, rowBack] };
-    try {
-        if (interaction.deferred || interaction.replied) {
-            await interaction.editReply(payload);
-        } else {
-            await interaction.update(payload);
-        }
-    } catch (e) { console.log(e); }
+    await safeUpdate(interaction, payload);
 }
 
 export async function showSkillLearnMenu(interaction, petIndex) {
@@ -327,13 +319,7 @@ export async function showSkillLearnMenu(interaction, petIndex) {
     const rowBack = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`inv_show_details_${petIndex}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary));
     
     const payload = { embeds: [embed], components: [rowBack] };
-    try {
-        if (interaction.deferred || interaction.replied) {
-            await interaction.editReply(payload);
-        } else {
-            await interaction.update(payload);
-        }
-    } catch (e) { console.log(e); }
+    await safeUpdate(interaction, payload);
 }
 
 // ==========================================
@@ -373,7 +359,7 @@ export async function handleFeed(interaction, petIndex, candyType) {
 
     // Kiểm tra kho dựa trên key chữ thường
     if (!userData.inventory.candies[candyType]) {
-         return interaction.followUp({ content: `🚫 Hết ${candyCfg?.name || 'kẹo'}!`, flags: [MessageFlags.Ephemeral] });
+        return interaction.followUp({ content: `🚫 Hết ${candyCfg?.name || 'kẹo'}!`, flags: [MessageFlags.Ephemeral] });
     }
 
     userData.inventory.candies[candyType]--;
@@ -419,9 +405,7 @@ export async function handleStatUpgrade(interaction, petIndex, statKey) {
 export async function handleInventoryInteraction(interaction) {
     const { customId } = interaction;
     
-    // Hàm này sẽ dùng customId.split('_')[2] để lấy key (normal, high, super, ultra)
-    // và xử lý logic feed/upgrade
-    // ... (Router logic remains the same) ...
+    // Router logic
 
     if (customId === 'inv_refresh') {
         await showInventory(interaction, 0);

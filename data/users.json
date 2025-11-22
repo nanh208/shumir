@@ -1,24 +1,310 @@
 {
   "1162815019264786513": {
-    "pets": [],
+    "pets": [
+      {
+        "id": "dragon_mythic_1763958461",
+        "name": "Mythic Alpha Dragon",
+        "nickname": "Mythic Alpha Dragon",
+        "icon": "<a:Rayquaza:1441631570506285166>",
+        "element": "Dragon",
+        "race": "Dragon",
+        "rarity": "Mythic",
+        "baseStats": {
+          "HP": 150000,
+          "MP": 70000,
+          "ATK": 3500,
+          "SATK": 3000,
+          "DEF": 2800,
+          "SPD": 1600
+        },
+        "level": 100,
+        "xp": 0,
+        "gen": 100,
+        "statPoints": 0,
+        "currentHP": 577707,
+        "currentMP": 270700,
+        "skills": [
+          "S1",
+          "dra_ulti",
+          "phy_49",
+          "dra_buff_5"
+        ],
+        "activeEffects": [
+          {
+            "name": "Sương Giá II",
+            "stat": "ATK",
+            "value": -0.1,
+            "type": "debuff",
+            "turns": 2
+          },
+          {
+            "name": "Sương Giá II",
+            "stat": "ATK",
+            "value": -0.1,
+            "type": "debuff",
+            "turns": 2
+          },
+          {
+            "name": "Sương Giá II",
+            "stat": "ATK",
+            "value": -0.1,
+            "type": "debuff",
+            "turns": 2
+          },
+          {
+            "name": "Sương Giá II",
+            "stat": "ATK",
+            "value": -0.1,
+            "type": "debuff",
+            "turns": 2
+          },
+          {
+            "name": "Sương Giá II",
+            "stat": "ATK",
+            "value": -0.1,
+            "type": "debuff",
+            "turns": 3
+          }
+        ],
+        "passive": "CRIT_MASTER"
+      },
+      {
+        "id": "fire_mythic_1763958462",
+        "name": "Mythic Inferno Wisp",
+        "race": "Elemental",
+        "rarity": "Mythic",
+        "element": "Fire",
+        "level": 100,
+        "exp": 0,
+        "gen": 100,
+        "icon": "<a:source:1440702357523660820>",
+        "passive": "VAMPIRISM",
+        "baseStats": {
+          "HP": 120000,
+          "MP": 80000,
+          "ATK": 2000,
+          "SATK": 4000,
+          "DEF": 2200,
+          "SPD": 1800
+        },
+        "skills": [
+          "S1",
+          "fir_ulti",
+          "lig_damage_5",
+          "fir_buff_5"
+        ],
+        "currentHP": 120000,
+        "currentMP": 80000,
+        "deathTime": null
+      },
+      {
+        "id": "mi9t8t8qyxenghbz6i9",
+        "name": "Knight",
+        "nickname": "Knight",
+        "icon": "<a:Keqing:1440702273801027695>",
+        "element": "Fire",
+        "race": "Human",
+        "rarity": "Legendary",
+        "baseStats": {
+          "HP": 1100,
+          "MP": 450,
+          "ATK": 1150,
+          "SATK": 900,
+          "DEF": 1050,
+          "SPD": 95
+        },
+        "level": 1,
+        "xp": 0,
+        "gen": 15,
+        "statPoints": 0,
+        "currentHP": 2270,
+        "currentMP": 928,
+        "skills": [
+          "S1",
+          "ice_debuff_2",
+          "dar_damage_4",
+          "wat_blast_1"
+        ],
+        "activeEffects": [],
+        "passive": "VAMPIRISM"
+      }
+    ],
     "inventory": {
       "candies": {
-        "normal": 0,
-        "high": 0,
-        "super": 0,
-        "ultra": 0
+        "normal": 10015,
+        "high": 9999,
+        "super": 9999,
+        "ultra": 9999
       },
-      "potions": 0,
+      "potions": 1007,
       "crates": {
-        "common": 0,
-        "mythic": 0
+        "common": 99,
+        "mythic": 99
       },
-      "skillBooks": []
+      "skillBooks": [
+        "phy_49",
+        "dra_ulti",
+        "fir_ulti",
+        "lig_ulti",
+        "gra_ulti",
+        "ice_ulti"
+      ]
     },
-    "gold": 1000,
+    "gold": 9999999,
     "codesRedeemed": [],
-    "hasClaimedStarter": false,
+    "hasClaimedStarter": true,
     "activePetIndex": 0,
     "createdAt": 1763782813353
+  },
+  "1185865935874162830": {
+    "pets": [
+      {
+        "id": "legend_p1_1763958471",
+        "name": "Legendary Golem",
+        "nickname": "Legendary Golem",
+        "icon": "<:Furina:1440702288032436460>",
+        "element": "Earth",
+        "race": "Dwarf",
+        "rarity": "Legendary",
+        "baseStats": {
+          "HP": 95000,
+          "MP": 40000,
+          "ATK": 2500,
+          "SATK": 2000,
+          "DEF": 3200,
+          "SPD": 1200
+        },
+        "level": 95,
+        "xp": 2530,
+        "gen": 98,
+        "statPoints": 0,
+        "currentHP": 273120,
+        "currentMP": 115776,
+        "skills": [
+          "S1",
+          "ear_def_5",
+          "phy_42",
+          "ear_nuke_5"
+        ],
+        "activeEffects": [],
+        "passive": "THORNS"
+      },
+      {
+        "id": "epic_p2_1763958472",
+        "name": "Epic Spirit Mage",
+        "race": "Elf",
+        "rarity": "Epic",
+        "element": "Ice",
+        "level": 80,
+        "exp": 0,
+        "gen": 90,
+        "icon": "<a:Keqing:1440702273801027695>",
+        "passive": "REGEN",
+        "baseStats": {
+          "HP": 75000,
+          "MP": 60000,
+          "ATK": 1800,
+          "SATK": 2800,
+          "DEF": 1500,
+          "SPD": 1500
+        },
+        "skills": [
+          "S1",
+          "ice_debuff_4",
+          "wat_def_4",
+          "ele_stun_3"
+        ],
+        "currentHP": 75000,
+        "currentMP": 60000,
+        "deathTime": null
+      },
+      {
+        "id": "mi9r7df87yo6k50hqa6",
+        "name": "Legendary Shadow",
+        "nickname": "Shadow",
+        "icon": "<a:Keqing:1440702273801027695>",
+        "element": "Water",
+        "race": "Unknown",
+        "rarity": "Legendary",
+        "baseStats": {
+          "HP": 1500,
+          "MP": 800,
+          "ATK": 1800,
+          "SATK": 1600,
+          "DEF": 1400,
+          "SPD": 150
+        },
+        "level": 50,
+        "xp": 0,
+        "gen": 95,
+        "statPoints": 0,
+        "currentHP": 1500,
+        "currentMP": 800,
+        "skills": [
+          "S1",
+          "wat_blast_4",
+          "dar_life_3"
+        ],
+        "activeEffects": [],
+        "passive": "VAMPIRISM"
+      },
+      {
+        "id": "mi9rz99i2etj991ldl9",
+        "name": "Golem",
+        "nickname": "Golem",
+        "icon": "<:Furina:1440702288032436460>",
+        "element": "Light",
+        "race": "Dwarf",
+        "rarity": "Rare",
+        "baseStats": {
+          "HP": 1800,
+          "MP": 300,
+          "ATK": 900,
+          "SATK": 900,
+          "DEF": 1500,
+          "SPD": 50
+        },
+        "level": 2,
+        "xp": 0,
+        "gen": 88,
+        "statPoints": 0,
+        "currentHP": 3119,
+        "currentMP": 527,
+        "skills": [
+          "S1",
+          "gra_poison_1",
+          "ice_debuff_3",
+          "wat_debuff_3"
+        ],
+        "activeEffects": [],
+        "passive": "CRIT_MASTER"
+      }
+    ],
+    "inventory": {
+      "candies": {
+        "normal": 10009,
+        "high": 9999,
+        "super": 9999,
+        "ultra": 9999
+      },
+      "potions": 1002,
+      "crates": {
+        "common": 99,
+        "mythic": 99
+      },
+      "skillBooks": [
+        "ice_ulti",
+        "ear_ulti",
+        "phy_46",
+        "lig_ulti",
+        "fir_ulti",
+        "dra_ulti"
+      ]
+    },
+    "gold": 9999999,
+    "codesRedeemed": [],
+    "hasClaimedStarter": true,
+    "activePetIndex": 0,
+    "createdAt": 1763783509369
   }
 }
