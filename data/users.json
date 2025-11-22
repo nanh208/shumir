@@ -21,7 +21,7 @@
         "xp": 0,
         "gen": 100,
         "statPoints": 0,
-        "currentHP": 577894,
+        "currentHP": 577900,
         "currentMP": 270700,
         "skills": [
           "S1",
@@ -130,16 +130,47 @@
         ],
         "activeEffects": [],
         "passive": "CRIT_MASTER"
+      },
+      {
+        "id": "miamcni3fq2vazk4cnm",
+        "name": "Knight",
+        "nickname": "Knight",
+        "icon": "<a:Mewtwu:1441834826549170399>",
+        "element": "Earth",
+        "race": "Human",
+        "rarity": "Common",
+        "baseStats": {
+          "HP": 1100,
+          "MP": 450,
+          "ATK": 1150,
+          "SATK": 900,
+          "DEF": 1050,
+          "SPD": 95
+        },
+        "level": 2,
+        "xp": 0,
+        "gen": 11,
+        "statPoints": 0,
+        "currentHP": 932,
+        "currentMP": 384,
+        "skills": [
+          "S1",
+          "ear_def_1",
+          "dra_mag_1",
+          "fir_ball_1"
+        ],
+        "activeEffects": [],
+        "passive": "EVASION"
       }
     ],
     "inventory": {
       "candies": {
-        "normal": 10092,
+        "normal": 10097,
         "high": 9999,
         "super": 9999,
         "ultra": 9999
       },
-      "potions": 1034,
+      "potions": 1035,
       "crates": {
         "common": 99,
         "mythic": 99
@@ -157,7 +188,7 @@
         "great": 999,
         "ultra": 999,
         "dusk": 999,
-        "master": 991
+        "master": 990
       }
     },
     "gold": 9999999,
