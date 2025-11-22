@@ -17,12 +17,12 @@
           "DEF": 1300,
           "SPD": 140
         },
-        "level": 16,
-        "xp": 582,
+        "level": 17,
+        "xp": 825,
         "gen": 95,
-        "statPoints": 23,
-        "currentHP": 3982,
-        "currentMP": 3345,
+        "statPoints": 26,
+        "currentHP": 3993,
+        "currentMP": 3355,
         "skills": [
           "S1",
           "wat_heal_4",
@@ -104,16 +104,17 @@
     ],
     "inventory": {
       "candies": {
-        "normal": 22,
+        "normal": 28,
         "high": 1,
-        "super": 0
+        "super": 0,
+        "ultra": 0
       },
       "crates": {
         "common": 1,
         "mythic": 0
       },
       "skillBooks": [],
-      "potions": 13
+      "potions": 16
     },
     "codesRedeemed": [],
     "hasClaimedStarter": true,

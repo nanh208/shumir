@@ -1,4 +1,4 @@
-// index.js — Shumir Bot (COMMONJS PHIÊN BẢN ĐẦY ĐỦ VÀ TỐI ƯU)
+// index.js — Shumir Bot (FIXED & UPDATED)
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
@@ -26,7 +26,6 @@ const wordGameStates = new Map();
 const configPath = path.resolve(__dirname, './data/game-config.json');
 
 // --- Ma Sói & Cờ Tỷ Phú (Logic cũ) ---
-// Kiểm tra file tồn tại trước khi require để tránh crash
 let activeWerewolfGames = new Map();
 try {
     const werewolfModule = require("./utils/activeWerewolfGames.js");
@@ -42,28 +41,29 @@ try {
 } catch (e) { console.warn("⚠️ Monopoly Module not found."); }
 
 // --- Pet Game (Dynamic Import cho ES Modules) ---
-// [CẬP NHẬT]: Thêm InventoryModule
-let SpawnModule, BattleModule, CommandModule, StarterPetModule, InventoryModule;
+let SpawnModule, BattleModule, CommandModule, StarterPetModule, InventoryModule, DatabaseModule;
 let spawner;
-let SpawnSystem, handleBattle, handleSlashCommand, handleButtons, setSpawnSystemRef, handleStarterCommand, handleInventoryInteraction;
+let SpawnSystem, handleBattle, handleSlashCommand, handleButtons, setSpawnSystemRef, handleStarterCommand, handleInventoryInteraction, Database;
 
 // Hàm nạp module không đồng bộ (Async Loader)
 async function loadGameModules() {
     try {
+        // [QUAN TRỌNG] Import Database để dùng cho lệnh Arena/Server Config
+        DatabaseModule = await import("./Database.mjs");
+        Database = DatabaseModule.Database;
+
         SpawnModule = await import("./SpawnSystem.mjs");
-        BattleModule = await import("./BattleManager.mjs"); // Hoặc Battle.mjs tùy tên file bạn lưu
+        BattleModule = await import("./BattleManager.mjs");
         CommandModule = await import("./CommandHandlers.mjs");
         StarterPetModule = await import("./StarterPet.mjs");
-        // [CẬP NHẬT]: Import Inventory
         InventoryModule = await import("./InventoryUI.mjs");
 
         SpawnSystem = SpawnModule.SpawnSystem;
-        handleBattle = BattleModule.handleInteraction; // Lưu ý: BattleManager.mjs hoặc Battle.mjs phải export handleInteraction
+        handleBattle = BattleModule.handleInteraction;
         handleSlashCommand = CommandModule.handleSlashCommand;
         handleButtons = CommandModule.handleButtons;
         setSpawnSystemRef = CommandModule.setSpawnSystemRef;
         handleStarterCommand = StarterPetModule.handleStarterCommand;
-        // [CẬP NHẬT]: Lấy hàm xử lý Inventory
         handleInventoryInteraction = InventoryModule.handleInventoryInteraction;
 
         console.log("✅ Đã tải xong các module Pet Game (ESM).");
@@ -108,16 +108,11 @@ const loadCommands = (directoryPath) => {
             try {
                 const cmd = require(path.join(directoryPath, file));
                 
-                // --- BỎ QUA LỆNH CŨ (pet_list, pet_info) ---
-                if (['pet_list', 'pet_info'].includes(cmd.data?.name)) {
-                    console.log(`[🗑️] Đã bỏ qua lệnh cũ: ${cmd.data.name}`);
-                    return; 
-                }
-                // ------------------------------------------
+                if (['pet_list', 'pet_info'].includes(cmd.data?.name)) return; 
 
                 if (cmd.data && cmd.execute) {
                     client.commands.set(cmd.data.name, cmd);
-                } else console.warn(`[⚠️] Lệnh ${file} thiếu data hoặc execute.`);
+                }
             } catch (error) {
                 console.error(`❌ Lỗi khi tải lệnh ${file}:`, error);
             }
@@ -126,13 +121,11 @@ const loadCommands = (directoryPath) => {
 
 if (fs.existsSync(commandsPath)) {
     loadCommands(commandsPath);
-    // Load thư mục con nếu có
     const subDirs = fs.readdirSync(commandsPath).filter(name => fs.statSync(path.join(commandsPath, name)).isDirectory());
     subDirs.forEach(folder => loadCommands(path.join(commandsPath, folder)));
-    
     console.log(`✅ Đã tải ${client.commands.size} slash commands.`);
 } else {
-    console.warn("⚠️ Thư mục commands không tồn tại:", commandsPath);
+    console.warn("⚠️ Thư mục commands không tồn tại.");
 }
 
 // --- BỘ NẠP EVENT ---
@@ -147,7 +140,6 @@ if (fs.existsSync(eventsPath)) {
                 if (event.name === Events.MessageCreate) {
                     event.execute(...args, wordGameStates);
                 } else {
-                    // Truyền spawner vào ready event nếu cần
                     event.execute(...args, wordGameStates, activeWerewolfGames, activeMonopolyGames, spawner);
                 }
             };
@@ -160,7 +152,6 @@ if (fs.existsSync(eventsPath)) {
     console.log(`✅ Đã tải ${eventFiles.length} events.`);
 }
 
-
 // ====== 5. READY & SPAWN SYSTEM START ======
 client.once(Events.ClientReady, async () => {
     console.log(`✅ Bot đã đăng nhập: ${client.user.tag}`);
@@ -170,48 +161,88 @@ client.once(Events.ClientReady, async () => {
     });
     
     // Đợi load xong các module ESM rồi mới khởi động hệ thống Pet
-await loadGameModules();
+    await loadGameModules();
     
     if (SpawnSystem) {
-        // 1. Khởi tạo Spawn System (Nó sẽ tự tạo RaidBossManager bên trong)
         spawner = new SpawnSystem(client); 
-        
-        // 2. [QUAN TRỌNG] Truyền RaidManager sang cho BattleManager
-        // Để khi đánh nhau, BattleManager biết gửi damage đi đâu
         if (BattleModule && BattleModule.setRaidManagerRef) {
             BattleModule.setRaidManagerRef(spawner.raidManager);
         }
-
-        // 3. Khởi động hệ thống Spawn
         spawner.start(); 
     }
 });
 
 
-// ====== 6. INTERACTION HANDLER ======
-client.on("interactionCreate", async (interaction) => {
+// ====== 6. INTERACTION HANDLER (ĐÃ SỬA LỖI VÀ GỘP LỆNH) ======
+client.on("interactionCreate", async (interaction) => { // <--- ĐÃ CÓ ASYNC
     try {
         const { customId, commandName } = interaction;
 
         // --- SLASH COMMAND ---
         if (interaction.isChatInputCommand()) {
             
-            // 1. Định tuyến Pet Game commands
-            // Giữ lại 'inventory', 'adventure', 'setup_spawn', 'code'. 
-            const petCommands = ['inventory', 'adventure', 'setup_spawn', 'code'];
+            // ============ 1. XỬ LÝ LỆNH ARENA & CONFIG (Đã chuyển vào trong) ============
+            if (commandName === 'arena') {
+                const channel = interaction.options.getChannel('channel');
+                const serverId = interaction.guildId;
 
+                // Kiểm tra quyền
+                if (!interaction.member.permissions.has('ManageChannels')) {
+                    return interaction.reply({ content: "🚫 Bạn không có quyền quản lý kênh!", ephemeral: true });
+                }
+
+                if (Database) {
+                    try {
+                        Database.setArenaChannel(serverId, channel.id);
+                        await interaction.reply(`🏟️ **Cài đặt thành công!**\nKênh đấu trường PvP đã được thiết lập tại: ${channel.toString()}\nCác lệnh \`/pvp\` chỉ có hiệu lực tại đây.`);
+                    } catch (error) {
+                        console.error(error);
+                        await interaction.reply({ content: "❌ Có lỗi khi lưu dữ liệu.", ephemeral: true });
+                    }
+                } else {
+                     await interaction.reply({ content: "❌ Database chưa sẵn sàng. Vui lòng thử lại sau vài giây.", ephemeral: true });
+                }
+                return; // Kết thúc xử lý lệnh này
+            }
+
+            if (commandName === 'lvsv') {
+                const difficulty = interaction.options.getString('độ_khó');
+                const serverId = interaction.guildId;
+
+                if (!interaction.member.permissions.has('ManageGuild')) {
+                    return interaction.reply({ content: "🚫 Bạn không có quyền quản lý Server!", ephemeral: true });
+                }
+
+                if (Database) {
+                    const config = Database.getServerConfig(serverId);
+                    config.difficulty = difficulty;
+                    Database.updateServerConfig(serverId, config);
+                    await interaction.reply(`⚙️ Độ khó của Server đã được chỉnh thành: **${difficulty.toUpperCase()}**`);
+                }
+                return;
+            }
+            // ==========================================================================
+
+            // 2. Định tuyến Pet Game commands
+            const petCommands = ['inventory', 'adventure', 'setup_spawn', 'code'];
             if (petCommands.includes(commandName)) {
                 if (!handleSlashCommand) return interaction.reply({ content: "⏳ Hệ thống Pet đang khởi động...", ephemeral: true });
-                
                 return handleSlashCommand(interaction);
             }
             
             // Xử lý lệnh Starter Pet (/pet random)
-            if (commandName === 'pet' && interaction.options.getSubcommand() === 'random') {
-                if (handleStarterCommand) return handleStarterCommand(interaction);
+            if (commandName === 'pet') {
+                 const sub = interaction.options.getSubcommand();
+                 if (sub === 'random') {
+                     if (handleStarterCommand) return handleStarterCommand(interaction);
+                 }
+                 // Chuyển các lệnh con khác sang handleSlashCommand nếu cần
+                 else if (['info', 'list', 'help', 'evolve', 'gacha'].includes(sub)) {
+                     if (handleSlashCommand) return handleSlashCommand(interaction);
+                 }
             }
 
-            // 2. Định tuyến commands game khác
+            // 3. Định tuyến commands game khác (cũ)
             const command = client.commands.get(commandName);
             if (!command) return;
             return command.execute(interaction, client, wordGameStates, activeWerewolfGames, activeMonopolyGames);
@@ -224,14 +255,12 @@ client.on("interactionCreate", async (interaction) => {
             if (handleBattle) return handleBattle(interaction); 
         }
 
-        // 2. [QUAN TRỌNG] Pet Game - Inventory Router (Túi đồ, Equip, Stats...)
+        // 2. Pet Game - Inventory Router
         if (customId?.startsWith("inv_")) {
-            if (handleInventoryInteraction) {
-                return handleInventoryInteraction(interaction);
-            }
+            if (handleInventoryInteraction) return handleInventoryInteraction(interaction);
         }
 
-        // 3. Pet Game - Adventure (Các nút khác nếu có)
+        // 3. Pet Game - Adventure
         if (customId?.startsWith("adv_")) {
              if (handleButtons) return handleButtons(interaction);
         }
@@ -274,4 +303,19 @@ client.login(token).catch(err => {
 
 process.on('unhandledRejection', (reason, promise) => {
     console.error('⚠️ Unhandled Rejection:', reason);
+    
+});
+client.on('error', (error) => {
+    console.error('❌ Discord Client Error:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    // Lỗi này thường do Promise bị reject mà không có .catch()
+    // Chúng ta log ra để biết nhưng không để bot tắt
+    console.log('⚠️ Lỗi chưa được xử lý (Unhandled Rejection):', reason);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('💀 Lỗi nghiêm trọng (Uncaught Exception):', err);
+    // Có thể process.exit(1) nếu cần, nhưng để bot chạy tiếp thì cứ log ra thôi
 });

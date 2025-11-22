@@ -1,10 +1,11 @@
 import { 
     PET_TEMPLATES, ELEMENTS, RARITY, 
     RARITY_CONFIG, RARITY_WEIGHTS, EMOJIS, 
-    LEVEL_CONFIG, ELEMENT_ADVANTAGE, PASSIVES, EVOLUTION_CHAINS 
+    LEVEL_CONFIG, ELEMENT_ADVANTAGE, PASSIVES, EVOLUTION_CHAINS,
+    RARITY_COLORS // <--- THÊM CÁI NÀY VÀO
 } from './Constants.mjs';
+
 import { getRandomSkills, getSkillById } from './SkillList.mjs';
-// Giả định Database được truy cập ở module khác, không cần import ở đây
 
 const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const randomElement = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -46,7 +47,7 @@ export class Pet {
         }
 
         // Tính toán chỉ số thực tế
-        this.currentStats = this.calculateStats(); // Chỉ số Max (đã cộng gen, lv)
+        this.currentStats = this.calculateStats(); 
         
         // Máu/Mana hiện tại (Nếu không có dữ liệu cũ thì full)
         this.currentHP = data.currentHP !== undefined ? data.currentHP : this.currentStats.HP;
@@ -225,6 +226,9 @@ export class Pet {
     }
     
     getRace() { return this.race; }
+    
+    // Helper cho hiển thị màu
+    getColor() { return RARITY_COLORS[this.rarity] || 0x0099FF; }
 }
 
 // ==========================================
@@ -339,7 +343,7 @@ export function processSkillEffect(caster, target, skill, logs, damageGained = 0
 // ==========================================
 
 /**
- * [NEW] Áp dụng hệ số độ khó vào chỉ số Pet (HP, ATK, DEF, SATK).
+ * Áp dụng hệ số độ khó vào chỉ số Pet (HP, ATK, DEF, SATK).
  * @param {Pet} petInstance 
  * @param {number} multiplier 
  */
@@ -368,37 +372,60 @@ export function applyDifficultyMultiplier(petInstance, multiplier) {
     return petInstance;
 }
 
-/**
- * [MODIFIED] Hàm tạo Boss cho Dungeon (Đổi tên từ createDungeonBoss)
- */
-export function createBossPet(difficulty) {
-    const template = PET_TEMPLATES.find(t => t.name === "Dragonoid") || PET_TEMPLATES[0];
+// --- CẤU HÌNH ĐỘ KHÓ CHO BOSS ---
+const DIFFICULTY_MULTIPLIERS = {
+    'dễ': 1,
+    'bth': 3,
+    'khó': 10,
+    'siêu khó': 50,
+    'ác quỷ': 250,
+    'kẻ hủy diệt': 1000
+};
+
+// Hàm tạo Boss (Đã gộp logic cũ và mới, trả về Pet Class)
+export function createBossPet(difficultyString = 'dễ') {
+    // 1. Lấy hệ số nhân từ chuỗi độ khó (mặc định là 1 nếu không tìm thấy)
+    const multiplier = DIFFICULTY_MULTIPLIERS[difficultyString] || 1;
+
+    // 2. Chỉ số cơ bản của Boss (Template)
+    const baseStatsTemplate = {
+        HP: 50000,  // 50k máu cơ bản
+        MP: 10000,
+        ATK: 500,
+        SATK: 500,
+        DEF: 200,
+        SPD: 50
+    };
+
+    // 3. Nhân chỉ số theo độ khó
+    const finalStats = {
+        HP: baseStatsTemplate.HP * multiplier,
+        MP: baseStatsTemplate.MP * multiplier,
+        ATK: baseStatsTemplate.ATK * (1 + multiplier * 0.1),
+        SATK: baseStatsTemplate.SATK * (1 + multiplier * 0.1),
+        DEF: baseStatsTemplate.DEF * (1 + multiplier * 0.2),
+        SPD: baseStatsTemplate.SPD
+    };
+
+    // 4. Trả về NEW PET để BattleManager dùng được các hàm getStats, calculateStats
     return new Pet({
-        name: `BOSS ${template.name}`,
-        race: template.race,
-        baseStats: { 
-            HP: template.baseHP * 5 * difficulty, 
-            MP: template.baseMP * 2,
-            ATK: template.baseATK * (1 + difficulty * 0.2), 
-            SATK: template.baseSATK * (1 + difficulty * 0.2),
-            DEF: template.baseDEF * (1 + difficulty * 0.1),
-            SPD: template.baseSPD 
-        },
-        element: ELEMENTS.DARK,
-        rarity: RARITY.MYTHIC,
-        level: difficulty * 10,
-        skills: ['S5', 'S2', 'S4'],
-        gen: 100,
-        passive: 'BERSEKER'
+        id: `boss_${Date.now()}`,   
+        name: `BOSS DRAGONOID [${difficultyString.toUpperCase()}]`,
+        race: 'Dragon',
+        rarity: 'Boss', // Rarity này giúp chặn bắt
+        element: 'Fire',
+        baseStats: finalStats,
+        level: 99,
+        skills: ['S1', 'S2', 'S3'],
+        icon: '🐲',
+        passive: 'BERSEKER',
+        currentHP: finalStats.HP,
+        currentMP: finalStats.MP
     });
 }
 
-/**
- * [MODIFIED] Hàm tạo Pet Wild (Chỉ nhận rarity key, logic chọn ngẫu nhiên đã chuyển sang SpawnSystem)
- * @param {string} rarityKey - Độ hiếm đã được tính toán từ SpawnSystem.
- */
+// Hàm tạo Wild Pet
 export function spawnWildPet(rarityKey = RARITY.COMMON) {
-    
     const template = randomElement(PET_TEMPLATES);
     const element = randomElement(Object.values(ELEMENTS)); 
     const wildLevel = randomInt(1, 5);
@@ -420,5 +447,3 @@ export function spawnWildPet(rarityKey = RARITY.COMMON) {
         passive: template.passive || null 
     });
 }
-
-// [REMOVED] The old createDungeonBoss function has been merged into createBossPet.

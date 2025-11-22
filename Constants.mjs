@@ -28,7 +28,40 @@ export const RARITY_COLORS = {
     'Common': 0x808080, 'Uncommon': 0x00FF00, 'Rare': 0x0099FF,
     'Epic': 0x9900FF, 'Legendary': 0xFFD700, 'Mythic': 0xFF0000
 };
+export async function handleSlashCommand(interaction) {
+    const { commandName, options } = interaction;
 
+    // --- LỆNH SETUP SPAWN ---
+    if (commandName === 'setup_spawn') {
+        try {
+            // 1. Báo cho Discord biết là đang xử lý (Tránh lỗi 3 giây)
+            // flags: [MessageFlags.Ephemeral] thay cho ephemeral: true để hết cảnh báo
+            await interaction.deferReply({ flags: [MessageFlags.Ephemeral] }); 
+
+            const channel = options.getChannel('channel');
+            
+            // 2. Lưu vào Database (Hành động tốn thời gian)
+            if (!channel) {
+                return interaction.editReply("❌ Không tìm thấy kênh.");
+            }
+            
+            // Gọi hàm setSpawnChannel (hoặc setArenaChannel tùy bạn dùng cái nào)
+            Database.setSpawnChannel(channel.id); 
+
+            // 3. Trả lời sau khi đã xong (Dùng editReply vì đã defer ở trên)
+            await interaction.editReply(`✅ Đã cài đặt kênh ${channel.toString()} làm khu vực xuất hiện Pet!`);
+            
+        } catch (error) {
+            console.error(error);
+            // Dùng editReply nếu có lỗi
+            await interaction.editReply("❌ Có lỗi khi cài đặt."); 
+        }
+        return;
+    }
+
+    // ... các lệnh khác (inventory, adventure...) giữ nguyên ...
+    // LƯU Ý: Với các lệnh khác, nếu xử lý lâu cũng nên dùng deferReply -> editReply
+}
 // === 2. PHẨM CHẤT (RARITY) & SCALING ===
 export const RARITY_CONFIG = {
     'Common':    { statMultiplier: 1.0, maxLv: 100, ballRate: 0.50, spawnRate: 0.45,  color: RARITY_COLORS.Common, icon: '⚪' },
