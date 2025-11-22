@@ -1,209 +1,24 @@
 {
   "1162815019264786513": {
-    "pets": [
-      {
-        "id": "mi7l0zw8gg2z4062st8",
-        "name": "Spirit",
-        "nickname": "High Elf Spirit",
-        "icon": "<:kiuri:1440702420094156851>",
-        "element": "Water",
-        "race": "Elf",
-        "rarity": "Epic",
-        "baseStats": {
-          "HP": 1800,
-          "MP": 1500,
-          "ATK": 1400,
-          "SATK": 2200,
-          "DEF": 1300,
-          "SPD": 140
-        },
-        "level": 17,
-        "xp": 825,
-        "gen": 95,
-        "statPoints": 26,
-        "currentHP": 3993,
-        "currentMP": 3355,
-        "skills": [
-          "S1",
-          "wat_heal_4",
-          "ice_stun_4",
-          "lig_buff_4",
-          "wat_blast_4"
-        ],
-        "activeEffects": [
-          {
-            "name": "Khử Nhiệt I",
-            "stat": "DEF",
-            "value": -0.05,
-            "type": "debuff",
-            "turns": 0
-          },
-          {
-            "name": "Khử Nhiệt I",
-            "stat": "DEF",
-            "value": -0.05,
-            "type": "debuff",
-            "turns": 1
-          },
-          {
-            "name": "Động Đất IV",
-            "stat": "SPD",
-            "value": -0.2,
-            "type": "debuff",
-            "turns": 2
-          },
-          {
-            "name": "Động Đất IV",
-            "stat": "SPD",
-            "value": -0.2,
-            "type": "debuff",
-            "turns": 3
-          }
-        ],
-        "passive": "REGEN"
-      },
-      {
-        "id": "mi909vmticilc5u950t",
-        "name": "Golem",
-        "nickname": "Golem",
-        "icon": "<:Rayquaza:1440702434644070533>",
-        "element": "Wind",
-        "race": "Dwarf",
-        "rarity": "Mythic",
-        "baseStats": {
-          "HP": 1830,
-          "MP": 300,
-          "ATK": 900,
-          "SATK": 900,
-          "DEF": 1500,
-          "SPD": 50
-        },
-        "level": 13,
-        "xp": 148,
-        "gen": 57,
-        "statPoints": 30,
-        "currentHP": 6217,
-        "currentMP": 1184,
-        "skills": [
-          "S1",
-          "lig_buff_4",
-          "ear_ulti",
-          "ice_debuff_1"
-        ],
-        "activeEffects": [
-          {
-            "name": "Thánh Lực IV",
-            "stat": "SATK",
-            "value": 0.4,
-            "type": "buff",
-            "turns": 3
-          }
-        ],
-        "passive": "BERSEKER"
-      }
-    ],
+    "pets": [],
     "inventory": {
       "candies": {
-        "normal": 28,
-        "high": 1,
+        "normal": 0,
+        "high": 0,
         "super": 0,
         "ultra": 0
       },
-      "crates": {
-        "common": 1,
-        "mythic": 0
-      },
-      "skillBooks": [],
-      "potions": 16
-    },
-    "codesRedeemed": [],
-    "hasClaimedStarter": true,
-    "gold": 5000,
-    "activePetIndex": 0
-  },
-  "1185865935874162830": {
-    "pets": [
-      {
-        "id": "mi8pkixarpcf6gq0ag",
-        "name": "King Slime",
-        "icon": "<a:source:1440702357523660820>",
-        "element": "Dragon",
-        "race": "Elemental",
-        "rarity": "Mythic",
-        "baseStats": {
-          "HP": 3500,
-          "MP": 1200,
-          "ATK": 2800,
-          "DEF": 3000,
-          "SPD": 110,
-          "SATK": 2500
-        },
-        "level": 30,
-        "xp": 0,
-        "gen": 100,
-        "statPoints": 10,
-        "currentHP": 12000,
-        "currentMP": 4500,
-        "skills": [
-          "phy_49",
-          "dra_mag_5",
-          "ear_ulti",
-          "ear_def_5",
-          "S5"
-        ],
-        "activeEffects": [],
-        "passive": "VAMPIRISM",
-        "deathTime": null
-      },
-      {
-        "id": "mi8zelojmjb2hk6tnq9",
-        "name": "Dragonoid",
-        "nickname": "Dragonoid",
-        "icon": "<a:Keqing:1440702273801027695>",
-        "element": "Dark",
-        "race": "Dragon",
-        "rarity": "Mythic",
-        "baseStats": {
-          "HP": 1200,
-          "MP": 600,
-          "ATK": 1250,
-          "SATK": 1250,
-          "DEF": 1100,
-          "SPD": 100
-        },
-        "level": 4,
-        "xp": 0,
-        "gen": 89,
-        "statPoints": 0,
-        "currentHP": 4494,
-        "currentMP": 2275,
-        "skills": [
-          "S1",
-          "dra_ulti",
-          "dar_ulti",
-          "dar_life_5",
-          "dra_phy_5"
-        ],
-        "activeEffects": [],
-        "passive": "VAMPIRISM"
-      }
-    ],
-    "inventory": {
-      "candies": {
-        "normal": 10,
-        "high": 5,
-        "super": 1
-      },
+      "potions": 0,
       "crates": {
         "common": 0,
-        "mythic": 1
+        "mythic": 0
       },
-      "skillBooks": [],
-      "potions": 10
+      "skillBooks": []
     },
+    "gold": 1000,
     "codesRedeemed": [],
-    "hasClaimedStarter": true,
-    "createdAt": 1763720326501,
-    "gold": 99999
+    "hasClaimedStarter": false,
+    "activePetIndex": 0,
+    "createdAt": 1763782813353
   }
 }
