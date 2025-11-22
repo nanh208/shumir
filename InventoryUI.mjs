@@ -59,7 +59,7 @@ async function safeUpdate(interaction, payload) {
 }
 
 // ==========================================
-// 1. GIAO DIỆN CHÍNH: TÚI ĐỒ & KHO PET (ĐÃ SỬA LỖI KEY)
+// 1. GIAO DIỆN CHÍNH: TÚI ĐỒ & KHO PET
 // ==========================================
 
 export async function showInventory(interaction, page = 0) {
@@ -69,9 +69,9 @@ export async function showInventory(interaction, page = 0) {
     
     if (userData.activePetIndex === undefined) userData.activePetIndex = 0;
 
-    // [ĐÃ SỬA] Khởi tạo .pokeballs (dùng đúng key đã log)
+    // Khởi tạo .pokeballs
     if (!userData.inventory) userData.inventory = { candies: {}, skillbooks: {}, crates: {}, potions: 0 };
-    if (!userData.inventory.pokeballs) userData.inventory.pokeballs = {}; // Dùng 'pokeballs'
+    if (!userData.inventory.pokeballs) userData.inventory.pokeballs = {}; 
     
     const inv = userData.inventory;
     const pets = userData.pets || [];
@@ -92,13 +92,13 @@ export async function showInventory(interaction, page = 0) {
     if (!hasCandy) itemDesc += "*Không có kẹo nào.*\n";
     itemDesc += `\n**${EMOJIS.BOX_COMMON} VẬT PHẨM KHÁC:**\n💊 Thuốc Hồi Phục: \`${inv.potions || 0}\`\n`;
     
-    // 2. [CẬP NHẬT] Balls - SỬ DỤNG inv.pokeballs
+    // 2. Balls
     itemDesc += `\n**${EMOJIS.BALL_MASTER} BÓNG THU PHỤC:**\n`;
     let hasBalls = false;
     
     for (const key in POKEBALLS) {
         const ball = POKEBALLS[key];
-        const qty = inv.pokeballs?.[key] || 0; // <--- ĐỌC TỪ inv.pokeballs
+        const qty = inv.pokeballs?.[key] || 0; 
         if (qty > 0) {
             itemDesc += `${ball.icon} **${ball.name}**: \`${qty}\`\n`;
             hasBalls = true;
@@ -194,12 +194,12 @@ export async function showInventory(interaction, page = 0) {
         return;
     }
 
-    // Logic cho Nút Bấm (Xử lý khi ở trong DM, nơi lỗi 10062 thường xảy ra)
+    // Logic cho Nút Bấm
     await safeUpdate(interaction, payload);
 }
 
 // ==========================================
-// 2. CHI TIẾT PET & CHỌN ĐỒNG HÀNH
+// 2. CHI TIẾT PET & CHỌN ĐỒNG HÀNH (ĐÃ SỬA LỖI XP)
 // ==========================================
 
 export async function showPetDetails(interaction, petIndex) {
@@ -216,7 +216,12 @@ export async function showPetDetails(interaction, petIndex) {
 
     const hpPercent = Math.round((p.currentHP / stats.HP) * 100);
     const mpPercent = Math.round((p.currentMP / stats.MP) * 100);
-    const xpMax = p.getExpToNextLevel();
+
+    // --- [FIX] SỬA LỖI NaN CHO XP ---
+    const xpMax = p.getExpToNextLevel() || 1; // Tránh chia cho 0 hoặc undefined
+    const currentExp = Number(p.currentExp) || 0; // Ép kiểu về số, nếu lỗi thì về 0
+    // -------------------------------
+
     const isActive = (userData.activePetIndex === parseInt(petIndex));
 
     const embed = new EmbedBuilder()
@@ -226,7 +231,7 @@ export async function showPetDetails(interaction, petIndex) {
         .setColor(isActive ? 0x00FF00 : rarityCfg.color)
         .setThumbnail(`https://cdn.discordapp.com/emojis/${p.icon.match(/\d+/)[0]}.png`)
         .addFields(
-            { name: '📊 TRẠNG THÁI', value: `${EMOJIS.HEART} HP: ${Math.round(p.currentHP)}/${stats.HP} (${hpPercent}%)\n` + `${EMOJIS.MANA} MP: ${Math.round(p.currentMP)}/${stats.MP} (${mpPercent}%)\n` + `✨ XP: ${Math.round(p.currentExp)}/${xpMax}`, inline: true },
+            { name: '📊 TRẠNG THÁI', value: `${EMOJIS.HEART} HP: ${Math.round(p.currentHP)}/${stats.HP} (${hpPercent}%)\n` + `${EMOJIS.MANA} MP: ${Math.round(p.currentMP)}/${stats.MP} (${mpPercent}%)\n` + `✨ XP: ${Math.round(currentExp)}/${xpMax}`, inline: true },
             { name: '⚔️ CHỈ SỐ', value: `ATK: ${stats.ATK} | DEF: ${stats.DEF}\nSPD: ${stats.SPD} | SATK: ${stats.SATK || 0}`, inline: true },
             { name: '🔥 ĐIỂM TIỀM NĂNG', value: `Hiện có: **${p.statPoints || 0}** điểm\n*(Dùng nút Nâng Cấp bên dưới)*`, inline: true }
         );
@@ -254,7 +259,7 @@ export async function showPetDetails(interaction, petIndex) {
 }
 
 // ==========================================
-// 3. CÁC MENU PHỤ (ĐÃ CẬP NHẬT CANDY)
+// 3. CÁC MENU PHỤ
 // ==========================================
 
 export async function showFeedMenu(interaction, petIndex) {
@@ -264,9 +269,14 @@ export async function showFeedMenu(interaction, petIndex) {
     const inv = userData.inventory.candies;
     const maxLv = RARITY_CONFIG[p.rarity]?.maxLv || 100;
 
+    // --- [FIX] SỬA LỖI NaN CHO XP TRONG MENU FEED ---
+    const xpMax = p.getExpToNextLevel() || 1;
+    const currentExp = Number(p.currentExp) || 0;
+    // -----------------------------------------------
+
     const embed = new EmbedBuilder()
         .setTitle(`🍽️ CHO ${p.name.toUpperCase()} ĂN`)
-        .setDescription(`Cấp độ hiện tại: **${p.level}/${maxLv}**\nXP hiện tại: \`${p.currentExp}/${p.getExpToNextLevel()}\`\n\n**Chọn loại kẹo muốn sử dụng:**`)
+        .setDescription(`Cấp độ hiện tại: **${p.level}/${maxLv}**\nXP hiện tại: \`${currentExp}/${xpMax}\`\n\n**Chọn loại kẹo muốn sử dụng:**`)
         .setColor(0x00FF00); 
 
     const rowCandies = new ActionRowBuilder();
@@ -289,7 +299,7 @@ export async function showFeedMenu(interaction, petIndex) {
         rowCandies.addComponents(
             new ButtonBuilder()
                 .setCustomId(`inv_feed_${keyLower}_${petIndex}`)
-                .setLabel(`Dùng ${cfg.name.split(' ').pop()}`) // Dùng tên cuối (Thường, Cấp, Tối Thượng)
+                .setLabel(`Dùng ${cfg.name.split(' ').pop()}`)
                 .setStyle(ButtonStyle.Primary)
                 .setDisabled(qty <= 0)
         );
@@ -384,7 +394,7 @@ export async function handleFeed(interaction, petIndex, candyType) {
 
     userData.inventory.candies[candyType]--;
     
-    // Thêm XP (Giả định candyCfg.xp tồn tại)
+    // Thêm XP
     const leveledUp = p.addExp(candyCfg.xp, POINTS_PER_LEVEL);
     
     userData.pets[petIndex] = p.getDataForSave();
@@ -455,10 +465,9 @@ export async function handleInventoryInteraction(interaction) {
         await showSkillLearnMenu(interaction, index);
     }
     else if (customId.startsWith('inv_feed_')) {
-        // Xử lý inv_feed_KEY_INDEX
         const parts = customId.split('_');
         const index = parseInt(parts.pop());
-        const type = parts[2]; // Lấy key chữ thường (normal, high, super, ultra)
+        const type = parts[2];
         await handleFeed(interaction, index, type);
     }
     else if (customId.startsWith('inv_upgrade_stat_')) {

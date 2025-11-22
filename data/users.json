@@ -21,7 +21,7 @@
         "xp": 0,
         "gen": 100,
         "statPoints": 0,
-        "currentHP": 577900,
+        "currentHP": 577894,
         "currentMP": 270700,
         "skills": [
           "S1",
@@ -30,41 +30,6 @@
           "dra_buff_5"
         ],
         "activeEffects": [
-          {
-            "name": "Ám Ảnh V",
-            "stat": "ATK",
-            "value": -0.4,
-            "type": "debuff",
-            "turns": 0
-          },
-          {
-            "name": "Ám Ảnh V",
-            "stat": "ATK",
-            "value": -0.4,
-            "type": "debuff",
-            "turns": 0
-          },
-          {
-            "name": "Thiêu Đốt III",
-            "stat": "hp",
-            "value": 0.08,
-            "type": "dot",
-            "turns": 0
-          },
-          {
-            "name": "Thiêu Đốt III",
-            "stat": "hp",
-            "value": 0.08,
-            "type": "dot",
-            "turns": 1
-          },
-          {
-            "name": "Thiêu Đốt III",
-            "stat": "hp",
-            "value": 0.08,
-            "type": "dot",
-            "turns": 1
-          },
           {
             "name": "Long Lực V",
             "stat": "ATK",
@@ -134,16 +99,47 @@
         ],
         "activeEffects": [],
         "passive": "VAMPIRISM"
+      },
+      {
+        "id": "miak20r1m5w0652m8a",
+        "name": "Knight",
+        "nickname": "Knight",
+        "icon": "<a:Rayquaza:1441631570506285166>",
+        "element": "Grass",
+        "race": "Human",
+        "rarity": "Mythic",
+        "baseStats": {
+          "HP": 1100,
+          "MP": 450,
+          "ATK": 1150,
+          "SATK": 900,
+          "DEF": 1050,
+          "SPD": 95
+        },
+        "level": 2,
+        "xp": 0,
+        "gen": 79,
+        "statPoints": 0,
+        "currentHP": 3946,
+        "currentMP": 1624,
+        "skills": [
+          "S1",
+          "ice_debuff_2",
+          "phy_17",
+          "phy_04"
+        ],
+        "activeEffects": [],
+        "passive": "CRIT_MASTER"
       }
     ],
     "inventory": {
       "candies": {
-        "normal": 10069,
+        "normal": 10092,
         "high": 9999,
         "super": 9999,
         "ultra": 9999
       },
-      "potions": 1024,
+      "potions": 1034,
       "crates": {
         "common": 99,
         "mythic": 99
@@ -157,11 +153,11 @@
         "ice_ulti"
       ],
       "pokeballs": {
-        "poke": 999,
+        "poke": 998,
         "great": 999,
         "ultra": 999,
         "dusk": 999,
-        "master": 999
+        "master": 991
       }
     },
     "gold": 9999999,
