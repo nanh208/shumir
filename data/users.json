@@ -309,7 +309,7 @@
           "SPD": 1200
         },
         "level": 95,
-        "xp": 3472,
+        "xp": 3784,
         "gen": 98,
         "statPoints": 0,
         "currentHP": 273120,
@@ -416,12 +416,12 @@
     ],
     "inventory": {
       "candies": {
-        "normal": 10013,
+        "normal": 10015,
         "high": 9999,
         "super": 9999,
         "ultra": 9999
       },
-      "potions": 1003,
+      "potions": 1004,
       "crates": {
         "common": 99,
         "mythic": 99
