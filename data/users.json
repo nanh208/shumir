@@ -130,16 +130,47 @@
         ],
         "activeEffects": [],
         "passive": "THORNS"
+      },
+      {
+        "id": "mibvk5uthxzgzb83h04",
+        "name": "Spirit",
+        "nickname": "Spirit",
+        "icon": "<a:Rayquaza:1441631570506285166>",
+        "element": "Water",
+        "race": "Elf",
+        "rarity": "Common",
+        "baseStats": {
+          "HP": 900,
+          "MP": 800,
+          "ATK": 1000,
+          "SATK": 1300,
+          "DEF": 950,
+          "SPD": 110
+        },
+        "level": 5,
+        "xp": 0,
+        "gen": 100,
+        "statPoints": 0,
+        "currentHP": 1104,
+        "currentMP": 984,
+        "skills": [
+          "S1",
+          "ear_blast_1",
+          "phy_02",
+          "win_spd_1"
+        ],
+        "activeEffects": [],
+        "passive": "THORNS"
       }
     ],
     "inventory": {
       "candies": {
-        "normal": 10162,
+        "normal": 10167,
         "high": 9999,
         "super": 9999,
         "ultra": 9999
       },
-      "potions": 1057,
+      "potions": 1058,
       "crates": {
         "common": 99,
         "mythic": 99
@@ -157,7 +188,7 @@
         "great": 999,
         "ultra": 998,
         "dusk": 999,
-        "master": 985
+        "master": 984
       }
     },
     "gold": 9999999,
