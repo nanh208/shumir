@@ -161,11 +161,42 @@
         ],
         "activeEffects": [],
         "passive": "EVASION"
+      },
+      {
+        "id": "mib2xaopegr9ulnvyv7",
+        "name": "Wisp",
+        "nickname": "Wisp",
+        "icon": "<a:hutao:1434904266597732473>",
+        "element": "Grass",
+        "race": "Elemental",
+        "rarity": "Legendary",
+        "baseStats": {
+          "HP": 800,
+          "MP": 700,
+          "ATK": 1200,
+          "SATK": 1300,
+          "DEF": 850,
+          "SPD": 130
+        },
+        "level": 2,
+        "xp": 0,
+        "gen": 49,
+        "statPoints": 0,
+        "currentHP": 1924,
+        "currentMP": 1685,
+        "skills": [
+          "S1",
+          "lig_debuff_3",
+          "wat_blast_4",
+          "dra_phy_5"
+        ],
+        "activeEffects": [],
+        "passive": "CRIT_MASTER"
       }
     ],
     "inventory": {
       "candies": {
-        "normal": 10097,
+        "normal": 10100,
         "high": 9999,
         "super": 9999,
         "ultra": 9999
@@ -186,7 +217,7 @@
       "pokeballs": {
         "poke": 998,
         "great": 999,
-        "ultra": 999,
+        "ultra": 998,
         "dusk": 999,
         "master": 990
       }
