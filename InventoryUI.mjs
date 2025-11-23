@@ -35,6 +35,21 @@ function createProgressBar(current, max, totalChars = 10) {
     return '🟦'.repeat(filled) + '⬜'.repeat(empty); 
 }
 
+// [FIX 1] Hàm Defer an toàn (Đã thêm lại)
+async function safeDefer(interaction, type = 'update') {
+    try {
+        if (!interaction.deferred && !interaction.replied) {
+            if (type === 'update') await interaction.deferUpdate();
+            else await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+        }
+    } catch (e) { 
+        if (e.code !== 10062) {
+             console.error("SafeDefer Error:", e.message);
+        }
+    }
+}
+
+
 // Hàm xử lý lỗi chung khi tương tác hết hạn
 async function safeUpdate(interaction, payload) {
     try {
@@ -44,8 +59,8 @@ async function safeUpdate(interaction, payload) {
             await interaction.update(payload);
         }
     } catch (e) {
-        // Xử lý lỗi 10062 (Unknown interaction) và InteractionNotReplied
-        if (e.code === 10062 || e.code === 'InteractionNotReplied') {
+        // Xử lý lỗi 10062 (Unknown interaction), InteractionNotReplied, hoặc 40060
+        if (e.code === 10062 || e.code === 'InteractionNotReplied' || e.code === 40060) {
              await interaction.followUp({ 
                  content: "⚠️ Phiên giao diện đã hết hạn (15 phút). Vui lòng sử dụng lệnh `/inventory` để mở lại.", 
                  embeds: payload.embeds, 
@@ -69,7 +84,6 @@ export async function showInventory(interaction, page = 0) {
     
     if (userData.activePetIndex === undefined) userData.activePetIndex = 0;
 
-    // Khởi tạo .pokeballs
     if (!userData.inventory) userData.inventory = { candies: {}, skillbooks: {}, crates: {}, potions: 0 };
     if (!userData.inventory.pokeballs) userData.inventory.pokeballs = {}; 
     
@@ -199,7 +213,7 @@ export async function showInventory(interaction, page = 0) {
 }
 
 // ==========================================
-// 2. CHI TIẾT PET & CHỌN ĐỒNG HÀNH (ĐÃ SỬA LỖI XP)
+// 2. CHI TIẾT PET & CHỌN ĐỒNG HÀNH
 // ==========================================
 
 export async function showPetDetails(interaction, petIndex) {
@@ -217,10 +231,8 @@ export async function showPetDetails(interaction, petIndex) {
     const hpPercent = Math.round((p.currentHP / stats.HP) * 100);
     const mpPercent = Math.round((p.currentMP / stats.MP) * 100);
 
-    // --- [FIX] SỬA LỖI NaN CHO XP ---
-    const xpMax = p.getExpToNextLevel() || 1; // Tránh chia cho 0 hoặc undefined
-    const currentExp = Number(p.currentExp) || 0; // Ép kiểu về số, nếu lỗi thì về 0
-    // -------------------------------
+    const xpMax = p.getExpToNextLevel() || 1; 
+    const currentExp = Number(p.currentExp) || 0; 
 
     const isActive = (userData.activePetIndex === parseInt(petIndex));
 
@@ -269,10 +281,8 @@ export async function showFeedMenu(interaction, petIndex) {
     const inv = userData.inventory.candies;
     const maxLv = RARITY_CONFIG[p.rarity]?.maxLv || 100;
 
-    // --- [FIX] SỬA LỖI NaN CHO XP TRONG MENU FEED ---
     const xpMax = p.getExpToNextLevel() || 1;
     const currentExp = Number(p.currentExp) || 0;
-    // -----------------------------------------------
 
     const embed = new EmbedBuilder()
         .setTitle(`🍽️ CHO ${p.name.toUpperCase()} ĂN`)
@@ -288,14 +298,12 @@ export async function showFeedMenu(interaction, petIndex) {
         const qty = inv[key.toLowerCase()] || 0;
         const keyLower = key.toLowerCase();
 
-        // Tạo Field
         embed.addFields({ 
             name: `${cfg.emoji} ${cfg.name}`, 
             value: `Còn: **${qty}**\nXP: +${cfg.xp}`, 
             inline: true 
         });
 
-        // Tạo Button
         rowCandies.addComponents(
             new ButtonBuilder()
                 .setCustomId(`inv_feed_${keyLower}_${petIndex}`)
@@ -357,8 +365,8 @@ export async function showSkillLearnMenu(interaction, petIndex) {
 // ==========================================
 
 export async function handleEquipPet(interaction, petIndex) {
-    await interaction.deferUpdate();
-
+    // ❌ XÓA: await interaction.deferUpdate(); // Deferral được Router xử lý
+    
     const userId = interaction.user.id;
     const userData = Database.getUser(userId);
     
@@ -367,18 +375,23 @@ export async function handleEquipPet(interaction, petIndex) {
 
     const pName = userData.pets[petIndex].name;
     
-    await interaction.followUp({ 
-        content: `✅ Đã chọn **${pName}** làm bạn đồng hành chiến đấu!`, 
-        flags: [MessageFlags.Ephemeral] 
-    });
+    // [FIX 40060 SAFETY] Bọc followUp trong try-catch
+    try {
+        await interaction.followUp({ 
+            content: `✅ Đã chọn **${pName}** làm bạn đồng hành chiến đấu!`, 
+            flags: [MessageFlags.Ephemeral] 
+        });
+    } catch (e) {
+        console.error("Lỗi FollowUp trong handleEquipPet:", e.message);
+    }
     
     await showPetDetails(interaction, petIndex);
 }
 
 // Xử lý cho ăn
 export async function handleFeed(interaction, petIndex, candyType) {
-    await interaction.deferUpdate();
-
+    // ❌ XÓA: await interaction.deferUpdate(); // Deferral được Router xử lý
+    
     const userId = interaction.user.id;
     const userData = Database.getUser(userId);
     const pData = userData.pets[petIndex];
@@ -387,9 +400,10 @@ export async function handleFeed(interaction, petIndex, candyType) {
     const candyKey = candyType.toUpperCase();
     const candyCfg = CANDIES[candyKey];
 
-    // Kiểm tra kho dựa trên key chữ thường
     if (!userData.inventory.candies[candyType] || userData.inventory.candies[candyType] <= 0) {
-        return interaction.followUp({ content: `🚫 Hết ${candyCfg?.name || 'kẹo'}!`, flags: [MessageFlags.Ephemeral] });
+        try {
+            return interaction.followUp({ content: `🚫 Hết ${candyCfg?.name || 'kẹo'}!`, flags: [MessageFlags.Ephemeral] });
+        } catch(e) {}
     }
 
     userData.inventory.candies[candyType]--;
@@ -403,14 +417,16 @@ export async function handleFeed(interaction, petIndex, candyType) {
     let msg = `✅ **${p.name}** đã ăn ${candyCfg.name} (+${candyCfg.xp} XP)!`;
     if (leveledUp) msg += `\n🆙 **LÊN CẤP!** Hiện tại Lv.${p.level}`;
 
-    await interaction.followUp({ content: msg, flags: [MessageFlags.Ephemeral] });
+    try {
+        await interaction.followUp({ content: msg, flags: [MessageFlags.Ephemeral] });
+    } catch(e) {}
     await showFeedMenu(interaction, petIndex); 
 }
 
 // Xử lý nâng stats
 export async function handleStatUpgrade(interaction, petIndex, statKey) {
-    await interaction.deferUpdate();
-
+    // ❌ XÓA: await interaction.deferUpdate(); // Deferral được Router xử lý
+    
     const userId = interaction.user.id;
     const userData = Database.getUser(userId);
     const p = new Pet(userData.pets[petIndex]);
@@ -421,10 +437,14 @@ export async function handleStatUpgrade(interaction, petIndex, statKey) {
         userData.pets[petIndex] = p.getDataForSave();
         Database.updateUser(userId, userData);
         
-        await interaction.followUp({ content: `✅ Đã tăng ${statKey.toUpperCase()}!`, flags: [MessageFlags.Ephemeral] });
+        try {
+            await interaction.followUp({ content: `✅ Đã tăng ${statKey.toUpperCase()}!`, flags: [MessageFlags.Ephemeral] });
+        } catch(e) {}
         await showStatUpgradeMenu(interaction, petIndex);
     } else {
-        await interaction.followUp({ content: "🚫 Không đủ điểm tiềm năng!", flags: [MessageFlags.Ephemeral] });
+        try {
+            await interaction.followUp({ content: "🚫 Không đủ điểm tiềm năng!", flags: [MessageFlags.Ephemeral] });
+        } catch(e) {}
     }
 }
 
@@ -435,8 +455,13 @@ export async function handleStatUpgrade(interaction, petIndex, statKey) {
 export async function handleInventoryInteraction(interaction) {
     const { customId } = interaction;
     
+    // ⚠️ [FIX TYPE ERROR & 10062] Gọi Defer ngay lập tức cho TẤT CẢ button/select menu
+    // Dùng kiểm tra isButton/isStringSelectMenu trực tiếp trên interaction (không destructure)
+    if (interaction.isButton && (interaction.isButton() || (interaction.isStringSelectMenu && interaction.isStringSelectMenu()))) {
+        await safeDefer(interaction, 'update');
+    }
+    
     // Router logic
-
     if (customId === 'inv_refresh') {
         await showInventory(interaction, 0);
     } 

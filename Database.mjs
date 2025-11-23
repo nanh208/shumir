@@ -183,11 +183,11 @@ export class Database {
     /**
      * Thiết lập kênh đấu trường cho server
      */
-    static setArenaChannel(serverId, channelId) {
-        const config = this.getServerConfig(serverId);
-        config.arenaChannelId = channelId;
-        this.updateServerConfig(serverId, config);
-    }
+static setArenaChannel(serverId, channelId) {
+    const config = this.getServerConfig(serverId);
+    config.arenaChannelId = channelId;
+    this.updateServerConfig(serverId, config);
+}
 
     /**
      * Lấy ID kênh đấu trường hiện tại

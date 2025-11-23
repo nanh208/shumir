@@ -1,7 +1,12 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { spawnWildPet, Pet } from './GameLogic.mjs'; 
+import { spawnWildPet, Pet, applyDifficultyMultiplier } from './GameLogic.mjs'; 
 import { Database } from './Database.mjs'; 
-import { RARITY_CONFIG, RARITY, ELEMENTS, RAID_BOSS_HOURS, RAID_BOSS_MINUTE, RARITY_WEIGHTS, DIFFICULTY_LEVELS } from './Constants.mjs'; 
+import { 
+    RARITY_CONFIG, RARITY, ELEMENTS, 
+    RAID_BOSS_HOURS, RAID_BOSS_MINUTE, RARITY_WEIGHTS, DIFFICULTY_LEVELS,
+    SCHEDULED_PVP_HOURS, SCHEDULED_PVP_MINUTE, PVP_EVENT_CONFIG,
+    FIXED_HOURLY_SPAWN_HOURS, FIXED_SPAWN_RARITIES // Imports cho Fixed Spawn
+} from './Constants.mjs'; 
 import { RaidBossManager } from './RaidBossManager.mjs'; 
 
 // =======================================================
@@ -26,6 +31,8 @@ function getEmojiUrl(emojiStr) {
     return null; 
 }
 
+const randomElement = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
 export class SpawnSystem {
     constructor(client) {
         this.client = client;
@@ -33,68 +40,184 @@ export class SpawnSystem {
         this.channelId = config.spawnChannelId || null;
         
         this.raidManager = new RaidBossManager(client); 
-        this.spawnTimer = null; // Biến lưu timer chính
-        this.bossCheckTimer = null; // Biến lưu timer check boss
+        this.spawnTimer = null; 
+        this.spawnTimeout = null; 
+        this.bossCheckTimer = null; 
         
         this.currentWeather = WEATHERS.CLEAR; 
         this.lastWeatherMessageId = null; 
+        
+        this.lastFixedSpawnHour = -1; // Theo dõi Fixed Spawn
+        
+        this.pvpEvent = {
+            active: false,
+            // ... (Các trường khác)
+        };
     }
 
-    // --- HÀM START MỚI (Dùng đệ quy) ---
     start() {
-        console.log("🚀 Hệ thống Spawn đã khởi động (Mode: Recursive).");
+        console.log("🚀 Hệ thống Spawn đã khởi động (Mode: Clock Alignment).");
         if (!this.channelId) return console.log("⚠️ Chưa cài đặt kênh Spawn! Hãy dùng lệnh /setup_spawn");
 
-        // Dọn dẹp timer cũ nếu có (Tránh trùng lặp khi bot reconnect)
-        this.stop();
+        this.stop(); 
 
-        // Bắt đầu vòng lặp spawn
-        this.spawnLoop();
-
-        // Bắt đầu check Boss (Chạy riêng biệt)
-        this.startScheduledRaidChecker();
+        // Test spawn
+        this.testSpawn();
+        this.testBossSpawn(); 
+        
+        this.scheduleRandomSpawn();
+        this.startScheduledRaidChecker(); 
     }
 
     stop() {
-        if (this.spawnTimer) clearTimeout(this.spawnTimer);
+        if (this.spawnTimer) clearInterval(this.spawnTimer); 
+        if (this.spawnTimeout) clearTimeout(this.spawnTimeout); 
         if (this.bossCheckTimer) clearInterval(this.bossCheckTimer);
         this.spawnTimer = null;
+        this.spawnTimeout = null;
         console.log("🛑 Đã dừng các luồng Spawn cũ.");
     }
 
-    // --- VÒNG LẶP SPAWN (CỐT LÕI) ---
-    async spawnLoop() {
-        // 1. Thực hiện Spawn ngay lập tức
-        await this.spawnBatch();
-
-        // 2. Sau khi spawn xong, hẹn giờ chạy lại chính hàm này sau 10 phút
-        const TEN_MINUTES = 10 * 60 * 1000; 
-        
-        console.log(`⏳ Đợt spawn tiếp theo trong 10 phút...`);
-        
-        // Gán vào this.spawnTimer để có thể clear nếu cần
-        this.spawnTimer = setTimeout(() => {
-            this.spawnLoop(); // Gọi lại chính nó -> Tạo vòng lặp vô tận nhưng tuần tự
-        }, TEN_MINUTES);
+    // [FIX CHANNEL] Hàm kiểm tra và lấy Channel an toàn
+    async getSafeSpawnChannel(channelId = this.channelId) {
+        if (!channelId) return null;
+        try {
+            const channel = await this.client.channels.fetch(channelId);
+            // Kiểm tra channel có phải là kênh văn bản (có .send) không
+            if (!channel || typeof channel.send !== 'function') {
+                console.error(`LỖI CẤU HÌNH: Kênh ID ${channelId} không phải là Kênh Văn bản!`);
+                return null;
+            }
+            return channel;
+        } catch (e) {
+            console.error(`Lỗi fetch kênh ${channelId}:`, e.message);
+            return null;
+        }
     }
     
-    // --- CÁC HÀM KHÁC GIỮ NGUYÊN ---
+    async testSpawn() {
+        const channel = await this.getSafeSpawnChannel();
+        if (!channel) return;
 
+        await this.clearOldPets(channel); 
+        this.changeWeather();
+        console.log("✨ Spawn 1 Pet kiểm tra khi khởi động.");
+        await this.createOnePet(channel, false); 
+    }
+    
+    async testBossSpawn() {
+        if (!this.channelId) return;
+        
+        const serverId = this.client.guilds.cache.first()?.id;
+        if (!serverId) return;
+        
+        const channel = await this.getSafeSpawnChannel();
+        if (!channel) return;
+
+        if (this.raidManager.activeBoss) return;
+        
+        const serverConfig = Database.getServerConfig(serverId); 
+        const difficultyKey = serverConfig?.difficulty || 'ác quỷ'; 
+        const difficultyMultiplier = DIFFICULTY_LEVELS?.[difficultyKey]?.multiplier || 250; 
+
+        console.log("🔥 Spawn Boss Raid Test khi khởi động.");
+        
+        await this.raidManager.spawnNewBoss(this.channelId, difficultyMultiplier);
+    }
+
+    scheduleRandomSpawn() {
+        const TEN_MINUTES = 10 * 60 * 1000;
+        const now = Date.now();
+        const nextMark = Math.ceil(now / TEN_MINUTES) * TEN_MINUTES;
+        const delay = nextMark - now;
+
+        console.log(`⏳ Đợt spawn định kỳ đầu tiên sẽ diễn ra sau: ${Math.round(delay/1000)}s (Vào đúng mốc thời gian chẵn).`);
+
+        this.spawnTimeout = setTimeout(() => {
+            this.spawnBatch();
+            
+            if (this.spawnTimer) clearInterval(this.spawnTimer);
+            this.spawnTimer = setInterval(() => {
+                this.spawnBatch(); 
+            }, TEN_MINUTES);
+            
+        }, delay);
+    }
+    
+    // [MỚI] Hàm Spawn Pet Siêu Cấp cố định
+    async startFixedRaritySpawn(channelId, serverId, difficultyMultiplier) {
+        const channel = await this.getSafeSpawnChannel(channelId);
+        if (!channel) return;
+
+        const forcedRarity = randomElement(FIXED_SPAWN_RARITIES); 
+        let scheduledPet = spawnWildPet(forcedRarity); 
+        scheduledPet.gen = 90 + Math.random() * 10;
+        
+        scheduledPet = applyDifficultyMultiplier(scheduledPet, difficultyMultiplier);
+
+        scheduledPet.currentStats = scheduledPet.calculateStats();
+        scheduledPet.currentHP = scheduledPet.currentStats.HP;
+        scheduledPet.currentMP = scheduledPet.currentStats.MP;
+        
+        const rarityCfg = RARITY_CONFIG[scheduledPet.rarity] || RARITY_CONFIG[RARITY.LEGENDARY];
+        
+        const announcementEmbed = new EmbedBuilder()
+            .setTitle(`⭐ CỰC HIẾM! Pet ${scheduledPet.rarity} Đã Xuất Hiện!`)
+            .setDescription(
+                `Một Pet **${scheduledPet.rarity}** (Gen **${Math.floor(scheduledPet.gen)}%**) cực mạnh đã xuất hiện!\n` +
+                `Mục tiêu: **${scheduledPet.name}** (Lv.${scheduledPet.level}) tại kênh <#${channelId}>!`
+            )
+            .setColor(rarityCfg.color)
+            .setFooter({ text: "Hãy nhanh chóng tìm kiếm và khiêu chiến!" });
+
+        await channel.send({ content: '@here', embeds: [announcementEmbed] });
+        
+        await this.createOnePet(channel, false, scheduledPet); 
+        console.log(`[FixedSpawn] Spawned ${scheduledPet.name} (${scheduledPet.rarity}) at ${new Date().toUTCString()}`);
+    }
+
+    // [CẬP NHẬT] Hàm kiểm tra lịch Raid Boss và Fixed Spawn
     startScheduledRaidChecker() {
         if (this.bossCheckTimer) clearInterval(this.bossCheckTimer);
         
         this.bossCheckTimer = setInterval(async () => {
             const now = new Date();
-            // Kiểm tra giờ và phút (Thêm check giây < 10 để tránh spam trong cùng 1 phút)
-            if (RAID_BOSS_HOURS.includes(now.getUTCHours()) && now.getUTCMinutes() === RAID_BOSS_MINUTE) {
+            const currentHour = now.getUTCHours();
+            const currentMinute = now.getUTCMinutes();
+            
+            const serverId = this.client.guilds.cache.first()?.id;
+            if (!serverId) return;
+            
+            const serverConfig = Database.getServerConfig(serverId); 
+            const difficultyMultiplier = DIFFICULTY_LEVELS?.[serverConfig.difficulty]?.multiplier || 1; 
+            const arenaChannelId = serverConfig.arenaChannelId;
+
+            // --- 1. FIXED RARITY SPAWN (Mốc 00 phút - Kênh Spawn chính) ---
+            if (FIXED_HOURLY_SPAWN_HOURS.includes(currentHour) && currentMinute === 0) {
+                if (currentHour !== this.lastFixedSpawnHour) {
+                    this.lastFixedSpawnHour = currentHour; 
+                    await this.startFixedRaritySpawn(this.channelId, serverId, difficultyMultiplier);
+                }
+            } else if (!FIXED_HOURLY_SPAWN_HOURS.includes(currentHour)) {
+                this.lastFixedSpawnHour = -1; 
+            }
+
+            // --- 2. RAỊD BOSS (PVE - Mốc 30 phút, Kênh Spawn) ---
+            if (RAID_BOSS_HOURS.includes(currentHour) && currentMinute === RAID_BOSS_MINUTE) {
                 if (this.raidManager.activeBoss) return;
-                
-                const serverConfig = Database.getServerConfig(this.channelId); 
-                const difficultyKey = serverConfig?.difficulty || 'ác quỷ'; 
-                const difficultyMultiplier = DIFFICULTY_LEVELS?.[difficultyKey]?.multiplier || 250; 
-                
                 await this.raidManager.spawnNewBoss(this.channelId, difficultyMultiplier);
             }
+            
+            // --- 3. PVP ARENA BOSS (Mốc 30 phút, Kênh Arena) ---
+            if (SCHEDULED_PVP_HOURS.includes(currentHour) && currentMinute === SCHEDULED_PVP_MINUTE) {
+                if (!this.pvpEvent.active && !this.raidManager.activeBoss && arenaChannelId) {
+                    if (globalRaidManager) {
+                        // Gọi hàm start Arena Boss (Được định nghĩa trong RaidBossManager)
+                        await globalRaidManager.startArenaBossEvent(arenaChannelId, serverId, serverConfig.difficulty);
+                    }
+                }
+            }
+
         }, 60 * 1000); // Check mỗi phút
     }
 
@@ -114,9 +237,8 @@ export class SpawnSystem {
     }
 
     async spawnBatch() {
-        if (!this.channelId) return;
-        let channel;
-        try { channel = await this.client.channels.fetch(this.channelId); } catch (e) { return; }
+        const channel = await this.getSafeSpawnChannel();
+        if (!channel) return;
 
         await this.clearOldPets(channel);
         this.changeWeather();
@@ -124,7 +246,7 @@ export class SpawnSystem {
         
         for (let i = 0; i < 10; i++) {
             const isVip = (i === 9) && (Math.random() < 0.3); 
-            await new Promise(r => setTimeout(r, 1500)); // Delay giữa các con pet
+            await new Promise(r => setTimeout(r, 1500)); 
             await this.createOnePet(channel, isVip);
         }
     }
@@ -166,11 +288,16 @@ export class SpawnSystem {
         const message = await channel.send({ embeds: [embed] });
         this.lastWeatherMessageId = message.id;
     }
-
-    async createOnePet(channel, isVip) {
-        const rarity = this.pickRandomRarity(); 
-        let rawPetData = spawnWildPet(rarity, isVip);
-        let pet = new Pet(rawPetData); 
+    
+    async createOnePet(channel, isVip, customPet = null) {
+        let pet;
+        if (customPet) {
+            pet = customPet;
+        } else {
+            const rarity = this.pickRandomRarity(); 
+            let rawPetData = spawnWildPet(rarity, isVip);
+            pet = new Pet(rawPetData); 
+        }
 
         let weatherBoostMsg = "";
         if (this.currentWeather.buff.includes(pet.element)) {
@@ -192,8 +319,8 @@ export class SpawnSystem {
             title = `✨👑 BOSS HOÀNG KIM: ${pet.name.toUpperCase()}`;
             color = 0xFFD700;
             thumbnail = "https://media.tenor.com/2roX3uxz_68AAAAi/cat.gif";
-        } else if (pet.gen >= 90) {
-            title = `✨ [Lv.${pet.level}] PET ĐỘT BIẾN: ${pet.name.toUpperCase()}`; 
+        } else if (pet.gen >= 90 || pet.rarity === RARITY.MYTHIC || pet.rarity === RARITY.LEGENDARY) {
+            title = `✨ [Lv.${pet.level}] PET ${pet.rarity.toUpperCase()}: ${pet.name.toUpperCase()}`; 
         }
 
         const embed = new EmbedBuilder()
@@ -209,7 +336,7 @@ export class SpawnSystem {
                 },
                 { 
                     name: '✨ Thông tin Gen', 
-                    value: `🧬 Gen: **${pet.gen}%** ${weatherBoostMsg}`, 
+                    value: `🧬 Gen: **${Math.floor(pet.gen)}%** ${weatherBoostMsg}`, 
                     inline: false 
                 }
             );
@@ -248,7 +375,7 @@ export class SpawnSystem {
     }
 }
 
-// Hàm hỗ trợ xóa Pet
+// Hàm hỗ trợ xóa Pet (Giữ nguyên)
 export async function removePetFromWorld(wildPetId, client) {
     if (activeWildPets && activeWildPets.has(String(wildPetId))) {
         const petInfo = activeWildPets.get(String(wildPetId));

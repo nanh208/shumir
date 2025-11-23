@@ -116,12 +116,12 @@
           "DEF": 1050,
           "SPD": 95
         },
-        "level": 2,
-        "xp": 0,
+        "level": 8,
+        "xp": 17,
         "gen": 79,
-        "statPoints": 0,
-        "currentHP": 3946,
-        "currentMP": 1624,
+        "statPoints": 18,
+        "currentHP": 3995,
+        "currentMP": 1687,
         "skills": [
           "S1",
           "ice_debuff_2",
@@ -223,16 +223,47 @@
         ],
         "activeEffects": [],
         "passive": "REGEN"
+      },
+      {
+        "id": "mibcmmy8hyi762h1mvi",
+        "name": "Slime",
+        "nickname": "Slime",
+        "icon": "<a:source:1440702357523660820>",
+        "element": "Fire",
+        "race": "Elemental",
+        "rarity": "Uncommon",
+        "baseStats": {
+          "HP": 1500,
+          "MP": 400,
+          "ATK": 950,
+          "SATK": 950,
+          "DEF": 1000,
+          "SPD": 80
+        },
+        "level": 3,
+        "xp": 0,
+        "gen": 98,
+        "statPoints": 0,
+        "currentHP": 2159,
+        "currentMP": 586,
+        "skills": [
+          "S1",
+          "win_nuke_1",
+          "fir_debuff_2",
+          "ear_nuke_2"
+        ],
+        "activeEffects": [],
+        "passive": "VAMPIRISM"
       }
     ],
     "inventory": {
       "candies": {
-        "normal": 10121,
+        "normal": 10148,
         "high": 9999,
         "super": 9999,
         "ultra": 9999
       },
-      "potions": 1044,
+      "potions": 1056,
       "crates": {
         "common": 99,
         "mythic": 99
@@ -250,7 +281,7 @@
         "great": 999,
         "ultra": 998,
         "dusk": 999,
-        "master": 990
+        "master": 989
       }
     },
     "gold": 9999999,
@@ -278,10 +309,10 @@
           "SPD": 1200
         },
         "level": 95,
-        "xp": 3080,
+        "xp": 3472,
         "gen": 98,
         "statPoints": 0,
-        "currentHP": 273116,
+        "currentHP": 273120,
         "currentMP": 115776,
         "skills": [
           "S1",
@@ -385,12 +416,12 @@
     ],
     "inventory": {
       "candies": {
-        "normal": 10011,
+        "normal": 10013,
         "high": 9999,
         "super": 9999,
         "ultra": 9999
       },
-      "potions": 1002,
+      "potions": 1003,
       "crates": {
         "common": 99,
         "mythic": 99

@@ -119,7 +119,8 @@ export const ELEMENT_ADVANTAGE = {
     [ELEMENTS.DRAGON]: { advantage: ['Dragon'], disadvantage: ['Ice', 'Dragon'] },
     [ELEMENTS.PHYSICAL]: { advantage: [], disadvantage: [] }
 };
-
+export const FIXED_HOURLY_SPAWN_HOURS = [0, 3, 6, 9, 12, 15, 18, 21];
+export const FIXED_SPAWN_RARITIES = [RARITY.LEGENDARY, RARITY.MYTHIC];
 // === 4. CẤU HÌNH LEVEL ===
 export const LEVEL_CONFIG = {
     BASE_XP: 100,
@@ -237,7 +238,13 @@ export const BOSS_DROPS = [
     { item_id: 'RARE_CANDY', rarity: 'Rare', chance: 0.20 }, 
     { item_id: 'GOLD_COIN', rarity: 'Common', chance: 1.00 }
 ];
-
+export const SCHEDULED_PVP_HOURS = [2, 5, 8, 11, 14, 17, 20, 23]; 
+export const SCHEDULED_PVP_MINUTE = 30;
+export const PVP_EVENT_CONFIG = {
+    SIGNUP_DURATION: 5 * 60 * 1000, // 5 phút đăng ký
+    BOSS_RARITY: RARITY.LEGENDARY, // Rank Pet Boss tối thiểu
+    LEVEL_BOOST: 20 // Tăng cấp độ Pet Boss thêm 20 level
+};
 // === 11. CẤU HÌNH SPAWN PET HIẾM THEO LỊCH ===
 export const SCHEDULED_SPAWN_HOURS = [0, 3, 6, 9, 12, 15, 18, 21]; 
 export const SCHEDULED_RARITIES = [

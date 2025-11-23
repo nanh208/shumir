@@ -278,6 +278,19 @@ export async function handleInteraction(interaction) {
         else if (customId.startsWith('pvp_surrender')) {
              if(battle) endPvP(interaction, battle, battle.p1.id === uid ? battle.p2 : battle.p1);
         }
+        if (customId === 'pvp_signup' && globalRaidManager) {
+            // Lấy Pet Active của người chơi để đăng ký
+            const userData = Database.getUser(uid);
+            const activePetData = userData.pets[userData.activePetIndex];
+
+            if (!activePetData) {
+                return interaction.reply({ content: "🚫 Bạn cần chọn Pet Active trước khi đăng ký!", ephemeral: true });
+            }
+            
+            // Chuyển xử lý đăng ký sang RaidBossManager
+            await globalRaidManager.handleSignup(interaction); // Đã có logic lấy Pet Active trong handleSignup
+            return;
+        }
         return;
     }
 
