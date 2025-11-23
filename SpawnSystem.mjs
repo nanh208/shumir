@@ -5,12 +5,12 @@ import {
     RARITY_CONFIG, RARITY, ELEMENTS, 
     RAID_BOSS_HOURS, RAID_BOSS_MINUTE, RARITY_WEIGHTS, DIFFICULTY_LEVELS,
     SCHEDULED_PVP_HOURS, SCHEDULED_PVP_MINUTE, PVP_EVENT_CONFIG,
-    FIXED_HOURLY_SPAWN_HOURS, FIXED_SPAWN_RARITIES // Imports cho Fixed Spawn
+    FIXED_HOURLY_SPAWN_HOURS, FIXED_SPAWN_RARITIES 
 } from './Constants.mjs'; 
 import { RaidBossManager } from './RaidBossManager.mjs'; 
 
 // =======================================================
-// BIẾN LƯU TRỮ (ĐƯỢC EXPORT ĐỂ DÙNG CHUNG)
+// BIẾN LƯU TRỮ
 // =======================================================
 export const activeWildPets = new Map();
 
@@ -36,10 +36,11 @@ const randomElement = (arr) => arr[Math.floor(Math.random() * arr.length)];
 export class SpawnSystem {
     constructor(client) {
         this.client = client;
+        this.raidManager = new RaidBossManager(client); // ✅ Đã khởi tạo ở đây là this.raidManager
+        
         const config = Database.getConfig() || {}; 
         this.channelId = config.spawnChannelId || null;
         
-        this.raidManager = new RaidBossManager(client); 
         this.spawnTimer = null; 
         this.spawnTimeout = null; 
         this.bossCheckTimer = null; 
@@ -47,11 +48,10 @@ export class SpawnSystem {
         this.currentWeather = WEATHERS.CLEAR; 
         this.lastWeatherMessageId = null; 
         
-        this.lastFixedSpawnHour = -1; // Theo dõi Fixed Spawn
+        this.lastFixedSpawnHour = -1; 
         
         this.pvpEvent = {
             active: false,
-            // ... (Các trường khác)
         };
     }
 
@@ -61,7 +61,6 @@ export class SpawnSystem {
 
         this.stop(); 
 
-        // Test spawn
         this.testSpawn();
         this.testBossSpawn(); 
         
@@ -78,12 +77,10 @@ export class SpawnSystem {
         console.log("🛑 Đã dừng các luồng Spawn cũ.");
     }
 
-    // [FIX CHANNEL] Hàm kiểm tra và lấy Channel an toàn
     async getSafeSpawnChannel(channelId = this.channelId) {
         if (!channelId) return null;
         try {
             const channel = await this.client.channels.fetch(channelId);
-            // Kiểm tra channel có phải là kênh văn bản (có .send) không
             if (!channel || typeof channel.send !== 'function') {
                 console.error(`LỖI CẤU HÌNH: Kênh ID ${channelId} không phải là Kênh Văn bản!`);
                 return null;
@@ -131,7 +128,7 @@ export class SpawnSystem {
         const nextMark = Math.ceil(now / TEN_MINUTES) * TEN_MINUTES;
         const delay = nextMark - now;
 
-        console.log(`⏳ Đợt spawn định kỳ đầu tiên sẽ diễn ra sau: ${Math.round(delay/1000)}s (Vào đúng mốc thời gian chẵn).`);
+        console.log(`⏳ Đợt spawn định kỳ đầu tiên sẽ diễn ra sau: ${Math.round(delay/1000)}s.`);
 
         this.spawnTimeout = setTimeout(() => {
             this.spawnBatch();
@@ -144,7 +141,6 @@ export class SpawnSystem {
         }, delay);
     }
     
-    // [MỚI] Hàm Spawn Pet Siêu Cấp cố định
     async startFixedRaritySpawn(channelId, serverId, difficultyMultiplier) {
         const channel = await this.getSafeSpawnChannel(channelId);
         if (!channel) return;
@@ -173,10 +169,9 @@ export class SpawnSystem {
         await channel.send({ content: '@here', embeds: [announcementEmbed] });
         
         await this.createOnePet(channel, false, scheduledPet); 
-        console.log(`[FixedSpawn] Spawned ${scheduledPet.name} (${scheduledPet.rarity}) at ${new Date().toUTCString()}`);
+        console.log(`[FixedSpawn] Spawned ${scheduledPet.name} (${scheduledPet.rarity})`);
     }
 
-    // [CẬP NHẬT] Hàm kiểm tra lịch Raid Boss và Fixed Spawn
     startScheduledRaidChecker() {
         if (this.bossCheckTimer) clearInterval(this.bossCheckTimer);
         
@@ -192,7 +187,7 @@ export class SpawnSystem {
             const difficultyMultiplier = DIFFICULTY_LEVELS?.[serverConfig.difficulty]?.multiplier || 1; 
             const arenaChannelId = serverConfig.arenaChannelId;
 
-            // --- 1. FIXED RARITY SPAWN (Mốc 00 phút - Kênh Spawn chính) ---
+            // --- 1. FIXED RARITY SPAWN ---
             if (FIXED_HOURLY_SPAWN_HOURS.includes(currentHour) && currentMinute === 0) {
                 if (currentHour !== this.lastFixedSpawnHour) {
                     this.lastFixedSpawnHour = currentHour; 
@@ -202,23 +197,23 @@ export class SpawnSystem {
                 this.lastFixedSpawnHour = -1; 
             }
 
-            // --- 2. RAỊD BOSS (PVE - Mốc 30 phút, Kênh Spawn) ---
+            // --- 2. RAID BOSS ---
             if (RAID_BOSS_HOURS.includes(currentHour) && currentMinute === RAID_BOSS_MINUTE) {
                 if (this.raidManager.activeBoss) return;
                 await this.raidManager.spawnNewBoss(this.channelId, difficultyMultiplier);
             }
             
-            // --- 3. PVP ARENA BOSS (Mốc 30 phút, Kênh Arena) ---
+            // --- 3. PVP ARENA BOSS ---
             if (SCHEDULED_PVP_HOURS.includes(currentHour) && currentMinute === SCHEDULED_PVP_MINUTE) {
                 if (!this.pvpEvent.active && !this.raidManager.activeBoss && arenaChannelId) {
-                    if (globalRaidManager) {
-                        // Gọi hàm start Arena Boss (Được định nghĩa trong RaidBossManager)
-                        await globalRaidManager.startArenaBossEvent(arenaChannelId, serverId, serverConfig.difficulty);
+                    // [FIXED] Dùng this.raidManager thay vì globalRaidManager
+                    if (this.raidManager) {
+                        await this.raidManager.startArenaBossEvent(arenaChannelId, serverId, serverConfig.difficulty);
                     }
                 }
             }
 
-        }, 60 * 1000); // Check mỗi phút
+        }, 60 * 1000); 
     }
 
     changeWeather() {
@@ -375,7 +370,6 @@ export class SpawnSystem {
     }
 }
 
-// Hàm hỗ trợ xóa Pet (Giữ nguyên)
 export async function removePetFromWorld(wildPetId, client) {
     if (activeWildPets && activeWildPets.has(String(wildPetId))) {
         const petInfo = activeWildPets.get(String(wildPetId));

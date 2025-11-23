@@ -70,37 +70,6 @@
         "deathTime": null
       },
       {
-        "id": "mi9t8t8qyxenghbz6i9",
-        "name": "Knight",
-        "nickname": "Knight",
-        "icon": "<a:Keqing:1440702273801027695>",
-        "element": "Fire",
-        "race": "Human",
-        "rarity": "Legendary",
-        "baseStats": {
-          "HP": 1100,
-          "MP": 450,
-          "ATK": 1150,
-          "SATK": 900,
-          "DEF": 1050,
-          "SPD": 95
-        },
-        "level": 1,
-        "xp": 0,
-        "gen": 15,
-        "statPoints": 0,
-        "currentHP": 2270,
-        "currentMP": 928,
-        "skills": [
-          "S1",
-          "ice_debuff_2",
-          "dar_damage_4",
-          "wat_blast_1"
-        ],
-        "activeEffects": [],
-        "passive": "VAMPIRISM"
-      },
-      {
         "id": "miak20r1m5w0652m8a",
         "name": "Knight",
         "nickname": "Knight",
@@ -130,130 +99,6 @@
         ],
         "activeEffects": [],
         "passive": "CRIT_MASTER"
-      },
-      {
-        "id": "miamcni3fq2vazk4cnm",
-        "name": "Knight",
-        "nickname": "Knight",
-        "icon": "<a:Mewtwu:1441834826549170399>",
-        "element": "Earth",
-        "race": "Human",
-        "rarity": "Common",
-        "baseStats": {
-          "HP": 1100,
-          "MP": 450,
-          "ATK": 1150,
-          "SATK": 900,
-          "DEF": 1050,
-          "SPD": 95
-        },
-        "level": 2,
-        "xp": 0,
-        "gen": 11,
-        "statPoints": 0,
-        "currentHP": 932,
-        "currentMP": 384,
-        "skills": [
-          "S1",
-          "ear_def_1",
-          "dra_mag_1",
-          "fir_ball_1"
-        ],
-        "activeEffects": [],
-        "passive": "EVASION"
-      },
-      {
-        "id": "mib2xaopegr9ulnvyv7",
-        "name": "Wisp",
-        "nickname": "Wisp",
-        "icon": "<a:hutao:1434904266597732473>",
-        "element": "Grass",
-        "race": "Elemental",
-        "rarity": "Legendary",
-        "baseStats": {
-          "HP": 800,
-          "MP": 700,
-          "ATK": 1200,
-          "SATK": 1300,
-          "DEF": 850,
-          "SPD": 130
-        },
-        "level": 2,
-        "xp": 0,
-        "gen": 49,
-        "statPoints": 0,
-        "currentHP": 1924,
-        "currentMP": 1685,
-        "skills": [
-          "S1",
-          "lig_debuff_3",
-          "wat_blast_4",
-          "dra_phy_5"
-        ],
-        "activeEffects": [],
-        "passive": "CRIT_MASTER"
-      },
-      {
-        "id": "mib3w44pfn7cgc5c5n",
-        "name": "Dragonoid",
-        "nickname": "Dragonoid",
-        "icon": "<a:Mewtwu:1441834826549170399>",
-        "element": "Physical",
-        "race": "Dragon",
-        "rarity": "Common",
-        "baseStats": {
-          "HP": 1200,
-          "MP": 600,
-          "ATK": 1250,
-          "SATK": 1250,
-          "DEF": 1100,
-          "SPD": 100
-        },
-        "level": 2,
-        "xp": 0,
-        "gen": 29,
-        "statPoints": 0,
-        "currentHP": 1103,
-        "currentMP": 554,
-        "skills": [
-          "S1",
-          "dar_life_1",
-          "phy_01",
-          "phy_20"
-        ],
-        "activeEffects": [],
-        "passive": "REGEN"
-      },
-      {
-        "id": "mibcmmy8hyi762h1mvi",
-        "name": "Slime",
-        "nickname": "Slime",
-        "icon": "<a:source:1440702357523660820>",
-        "element": "Fire",
-        "race": "Elemental",
-        "rarity": "Uncommon",
-        "baseStats": {
-          "HP": 1500,
-          "MP": 400,
-          "ATK": 950,
-          "SATK": 950,
-          "DEF": 1000,
-          "SPD": 80
-        },
-        "level": 3,
-        "xp": 0,
-        "gen": 98,
-        "statPoints": 0,
-        "currentHP": 2159,
-        "currentMP": 586,
-        "skills": [
-          "S1",
-          "win_nuke_1",
-          "fir_debuff_2",
-          "ear_nuke_2"
-        ],
-        "activeEffects": [],
-        "passive": "VAMPIRISM"
       },
       {
         "id": "mibiz7tods7lev79fc8",
@@ -289,7 +134,7 @@
     ],
     "inventory": {
       "candies": {
-        "normal": 10153,
+        "normal": 10162,
         "high": 9999,
         "super": 9999,
         "ultra": 9999
@@ -312,7 +157,7 @@
         "great": 999,
         "ultra": 998,
         "dusk": 999,
-        "master": 988
+        "master": 985
       }
     },
     "gold": 9999999,

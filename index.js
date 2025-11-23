@@ -162,7 +162,7 @@ const eventCallback = (...args) => {
 client.once(Events.ClientReady, async () => {
     console.log(`✅ Bot đã đăng nhập: ${client.user.tag}`);
     client.user.setPresence({
-        activities: [{ name: "🎉 Shumir: Pet & Games!", type: 0 }],
+        activities: [{ name: "🎉 Shumir đến chơi !", type: 0 }],
         status: "online",
     });
     
