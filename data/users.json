@@ -192,16 +192,47 @@
         ],
         "activeEffects": [],
         "passive": "CRIT_MASTER"
+      },
+      {
+        "id": "mib3w44pfn7cgc5c5n",
+        "name": "Dragonoid",
+        "nickname": "Dragonoid",
+        "icon": "<a:Mewtwu:1441834826549170399>",
+        "element": "Physical",
+        "race": "Dragon",
+        "rarity": "Common",
+        "baseStats": {
+          "HP": 1200,
+          "MP": 600,
+          "ATK": 1250,
+          "SATK": 1250,
+          "DEF": 1100,
+          "SPD": 100
+        },
+        "level": 2,
+        "xp": 0,
+        "gen": 29,
+        "statPoints": 0,
+        "currentHP": 1103,
+        "currentMP": 554,
+        "skills": [
+          "S1",
+          "dar_life_1",
+          "phy_01",
+          "phy_20"
+        ],
+        "activeEffects": [],
+        "passive": "REGEN"
       }
     ],
     "inventory": {
       "candies": {
-        "normal": 10100,
+        "normal": 10121,
         "high": 9999,
         "super": 9999,
         "ultra": 9999
       },
-      "potions": 1035,
+      "potions": 1044,
       "crates": {
         "common": 99,
         "mythic": 99
@@ -215,7 +246,7 @@
         "ice_ulti"
       ],
       "pokeballs": {
-        "poke": 998,
+        "poke": 996,
         "great": 999,
         "ultra": 998,
         "dusk": 999,

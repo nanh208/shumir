@@ -1,7 +1,7 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { spawnWildPet, Pet } from './GameLogic.mjs'; 
 import { Database } from './Database.mjs'; 
-import { RARITY_CONFIG, RARITY, ELEMENTS, ELEMENT_ICONS, RAID_BOSS_HOURS, RAID_BOSS_MINUTE, RARITY_WEIGHTS, DIFFICULTY_LEVELS } from './Constants.mjs'; 
+import { RARITY_CONFIG, RARITY, ELEMENTS, RAID_BOSS_HOURS, RAID_BOSS_MINUTE, RARITY_WEIGHTS, DIFFICULTY_LEVELS } from './Constants.mjs'; 
 import { RaidBossManager } from './RaidBossManager.mjs'; 
 
 // =======================================================
@@ -33,39 +33,59 @@ export class SpawnSystem {
         this.channelId = config.spawnChannelId || null;
         
         this.raidManager = new RaidBossManager(client); 
-        this.randomSpawnInterval = null; 
-        this.scheduledSpawnChecker = null; 
+        this.spawnTimer = null; // Biến lưu timer chính
+        this.bossCheckTimer = null; // Biến lưu timer check boss
         
         this.currentWeather = WEATHERS.CLEAR; 
         this.lastWeatherMessageId = null; 
     }
 
+    // --- HÀM START MỚI (Dùng đệ quy) ---
     start() {
-        console.log("🚀 Hệ thống Spawn đã khởi động.");
+        console.log("🚀 Hệ thống Spawn đã khởi động (Mode: Recursive).");
         if (!this.channelId) return console.log("⚠️ Chưa cài đặt kênh Spawn! Hãy dùng lệnh /setup_spawn");
 
-        this.spawnBatch(); 
-        this.scheduleRandomSpawn();
+        // Dọn dẹp timer cũ nếu có (Tránh trùng lặp khi bot reconnect)
+        this.stop();
+
+        // Bắt đầu vòng lặp spawn
+        this.spawnLoop();
+
+        // Bắt đầu check Boss (Chạy riêng biệt)
         this.startScheduledRaidChecker();
     }
 
-    scheduleRandomSpawn() {
-        const TEN_MINUTES = 10 * 60 * 1000;
-        const now = Date.now();
-        const nextMark = Math.ceil(now / TEN_MINUTES) * TEN_MINUTES;
-        const delay = nextMark - now;
+    stop() {
+        if (this.spawnTimer) clearTimeout(this.spawnTimer);
+        if (this.bossCheckTimer) clearInterval(this.bossCheckTimer);
+        this.spawnTimer = null;
+        console.log("🛑 Đã dừng các luồng Spawn cũ.");
+    }
 
-        setTimeout(() => {
-            this.spawnBatch();
-            this.randomSpawnInterval = setInterval(() => {
-                this.spawnBatch(); 
-            }, TEN_MINUTES); 
-        }, delay);
+    // --- VÒNG LẶP SPAWN (CỐT LÕI) ---
+    async spawnLoop() {
+        // 1. Thực hiện Spawn ngay lập tức
+        await this.spawnBatch();
+
+        // 2. Sau khi spawn xong, hẹn giờ chạy lại chính hàm này sau 10 phút
+        const TEN_MINUTES = 10 * 60 * 1000; 
+        
+        console.log(`⏳ Đợt spawn tiếp theo trong 10 phút...`);
+        
+        // Gán vào this.spawnTimer để có thể clear nếu cần
+        this.spawnTimer = setTimeout(() => {
+            this.spawnLoop(); // Gọi lại chính nó -> Tạo vòng lặp vô tận nhưng tuần tự
+        }, TEN_MINUTES);
     }
     
+    // --- CÁC HÀM KHÁC GIỮ NGUYÊN ---
+
     startScheduledRaidChecker() {
-        this.scheduledSpawnChecker = setInterval(async () => {
+        if (this.bossCheckTimer) clearInterval(this.bossCheckTimer);
+        
+        this.bossCheckTimer = setInterval(async () => {
             const now = new Date();
+            // Kiểm tra giờ và phút (Thêm check giây < 10 để tránh spam trong cùng 1 phút)
             if (RAID_BOSS_HOURS.includes(now.getUTCHours()) && now.getUTCMinutes() === RAID_BOSS_MINUTE) {
                 if (this.raidManager.activeBoss) return;
                 
@@ -75,7 +95,7 @@ export class SpawnSystem {
                 
                 await this.raidManager.spawnNewBoss(this.channelId, difficultyMultiplier);
             }
-        }, 60 * 1000);
+        }, 60 * 1000); // Check mỗi phút
     }
 
     changeWeather() {
@@ -104,7 +124,7 @@ export class SpawnSystem {
         
         for (let i = 0; i < 10; i++) {
             const isVip = (i === 9) && (Math.random() < 0.3); 
-            await new Promise(r => setTimeout(r, 1500)); 
+            await new Promise(r => setTimeout(r, 1500)); // Delay giữa các con pet
             await this.createOnePet(channel, isVip);
         }
     }
@@ -228,7 +248,7 @@ export class SpawnSystem {
     }
 }
 
-// 👇 HÀM NÀY ĐÃ ĐƯỢC CHUYỂN VỀ ĐÂY ĐỂ CÁC FILE KHÁC GỌI
+// Hàm hỗ trợ xóa Pet
 export async function removePetFromWorld(wildPetId, client) {
     if (activeWildPets && activeWildPets.has(String(wildPetId))) {
         const petInfo = activeWildPets.get(String(wildPetId));

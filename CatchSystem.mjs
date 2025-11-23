@@ -7,19 +7,50 @@ import {
 } from 'discord.js';
 
 import { Database } from './Database.mjs';
-import { POKEBALLS } from './Constants.mjs';
+import { POKEBALLS, RARITY_CONFIG } from './Constants.mjs';
 import { removePetFromWorld, activeBattles, calculateCatchRate } from './BattleManager.mjs';
+function calculateLocalCatchRate(wildPet) {
+    const maxHP = wildPet.getStats().HP;
+    const currentHP = wildPet.currentHP;
+    const rarityInfo = RARITY_CONFIG[wildPet.rarity];
+    
+    // 1. Tỷ lệ cơ bản theo độ hiếm (Đã chỉnh thấp trong Constants)
+    let baseRate = rarityInfo ? rarityInfo.ballRate : 0.1;
 
+    // 2. Bonus theo % Máu đã mất:
+    // - Đầy máu (100%): Bonus = 0
+    // - Gần chết (1%): Bonus = ~1.0 (Tăng gấp đôi tỷ lệ cơ bản)
+    const hpPercent = currentHP / maxHP;
+    const hpBonus = (1 - hpPercent); 
+
+    // 3. Công thức: Base * (1 + Bonus Máu * 2)
+    // Ví dụ: Mythic (0.02)
+    // - Đầy máu: 0.02 * 1 = 2%
+    // - 1 Máu: 0.02 * (1 + 1*2) = 0.06 = 6%
+    let finalBase = baseRate * (1 + (hpBonus * 2));
+
+    return finalBase;
+}
 // Hàm hỗ trợ update UI an toàn (Tránh lỗi InteractionNotReplied)
 async function safeReply(interaction, payload) {
     try {
+        // 1. Nếu đã Defer hoặc đã Reply trước đó -> Bắt buộc dùng editReply
         if (interaction.deferred || interaction.replied) {
-            await interaction.editReply(payload);
-        } else {
-            await interaction.update(payload);
+            return await interaction.editReply(payload);
         }
+        // 2. Nếu chưa, thử Update (cho nút bấm)
+        return await interaction.update(payload);
     } catch (e) {
-        if (e.code !== 10062 && e.code !== 'InteractionNotReplied') {
+        // 3. Nếu lỗi 40060 (Đã acknowledged ở đâu đó mà biến chưa cập nhật)
+        // -> Chuyển sang editReply ngay lập tức
+        if (e.code === 40060 || e.code === 'InteractionAlreadyReplied') {
+            try {
+                return await interaction.editReply(payload);
+            } catch (err2) {
+                // Nếu vẫn lỗi thì bỏ qua (Interaction có thể đã hết hạn)
+                console.error("SafeReply Recover Failed:", err2.message);
+            }
+        } else if (e.code !== 10062) { // 10062 là lỗi Unknown Interaction (hết hạn), bỏ qua
             console.error("CatchSystem UI Error:", e.message);
         }
     }
@@ -33,7 +64,7 @@ export async function showCatchBallInterface(interaction, battle) {
     const userData = Database.getUser(userId);
     const { wildPet, playerPet } = battle;
 
-    // Tính tỷ lệ bắt cơ bản từ BattleManager
+    // Tính tỷ lệ bắt cơ bản từ BattleManager (Vẫn tính toán nhưng không hiển thị)
     const baseRate = calculateCatchRate(playerPet, wildPet);
 
     const embed = new EmbedBuilder()
@@ -56,14 +87,14 @@ export async function showCatchBallInterface(interaction, battle) {
         // [FIX LỖI NaN]: Dùng 'multiplier' thay vì 'rate'
         const multiplier = ballInfo.multiplier || 1.0;
         
-        // Tính tỷ lệ hiển thị (Max 100%)
+        // Tính tỷ lệ (Vẫn giữ logic tính để code không lỗi, nhưng không dùng hiển thị)
         let ratePercent = Math.min(baseRate * multiplier, 1.0) * 100;
 
         // Nút bấm chọn bóng
-        // Chỉ hiện nếu có bóng hoặc để hiển thị cho đẹp (ở đây set disabled nếu hết bóng)
+        // CẬP NHẬT: Đã xóa phần hiển thị % trong setLabel
         const btn = new ButtonBuilder()
             .setCustomId(`ball_${key}_${userId}`)
-            .setLabel(`${ballInfo.name} (${qty}) - ${Math.round(ratePercent)}%`)
+            .setLabel(`${ballInfo.name} (${qty})`) 
             .setStyle(ballInfo.style || ButtonStyle.Secondary)
             .setDisabled(qty <= 0);
 
@@ -137,9 +168,10 @@ export async function handleCatchAction(interaction, battle) {
         finalRate *= 1.5;
     }
 
+    // CẬP NHẬT: Xóa log hiển thị tỷ lệ % để người chơi không biết
     const catchLog = [
         `🎾 **${interaction.user.username}** ném **${ballConfig.name}**!`,
-        `... Tỷ lệ thành công: ${Math.round(Math.min(finalRate, 1.0) * 100)}%`
+        `... Chiếc bóng đang lắc lư ...` 
     ];
 
     // --- LOGIC RNG ---

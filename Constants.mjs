@@ -75,12 +75,12 @@ export async function handleSlashCommand(interaction) {
 }
 // === 2. PHẨM CHẤT (RARITY) & SCALING ===
 export const RARITY_CONFIG = {
-    'Common':    { statMultiplier: 1.0, maxLv: 100, ballRate: 0.50, spawnRate: 0.45,  color: RARITY_COLORS.Common, icon: '⚪' },
-    'Uncommon':  { statMultiplier: 1.2, maxLv: 100, ballRate: 0.60, spawnRate: 0.25,  color: RARITY_COLORS.Uncommon, icon: '🌿' },
-    'Rare':      { statMultiplier: 1.5, maxLv: 100, ballRate: 0.65, spawnRate: 0.15,  color: RARITY_COLORS.Rare, icon: '💧' },
-    'Epic':      { statMultiplier: 1.8, maxLv: 100, ballRate: 0.70, spawnRate: 0.10,  color: RARITY_COLORS.Epic, icon: '🔥' },
-    'Legendary': { statMultiplier: 2.4, maxLv: 100, ballRate: 1.00, spawnRate: 0.04,  color: RARITY_COLORS.Legendary, icon: '✨' },
-    'Mythic':    { statMultiplier: 3.2, maxLv: 100, ballRate: 1.00, spawnRate: 0.01,  color: RARITY_COLORS.Mythic, icon: '👑' }
+    'Common':    { statMultiplier: 1.0, maxLv: 100, ballRate: 0.40, spawnRate: 0.45,  color: RARITY_COLORS.Common, icon: '⚪' }, // 40%
+    'Uncommon':  { statMultiplier: 1.2, maxLv: 100, ballRate: 0.30, spawnRate: 0.25,  color: RARITY_COLORS.Uncommon, icon: '🌿' }, // 30%
+    'Rare':      { statMultiplier: 1.5, maxLv: 100, ballRate: 0.20, spawnRate: 0.15,  color: RARITY_COLORS.Rare, icon: '💧' }, // 20%
+    'Epic':      { statMultiplier: 1.8, maxLv: 100, ballRate: 0.10, spawnRate: 0.10,  color: RARITY_COLORS.Epic, icon: '🔥' }, // 10%
+    'Legendary': { statMultiplier: 2.4, maxLv: 100, ballRate: 0.05, spawnRate: 0.04,  color: RARITY_COLORS.Legendary, icon: '✨' }, // 5%
+    'Mythic':    { statMultiplier: 3.2, maxLv: 100, ballRate: 0.02, spawnRate: 0.01,  color: RARITY_COLORS.Mythic, icon: '👑' }  // 2%
 };
 
 export const RARITY = {

@@ -10,10 +10,7 @@ import { activeWildPets } from './SpawnSystem.mjs';
 import { Database } from './Database.mjs';
 import { Pet, calculateDamage, processSkillEffect, createBossPet } from './GameLogic.mjs'; 
 import { getSkillById } from './SkillList.mjs'; 
-// Import thêm RARITY_CONFIG để lấy thông số chuẩn
-import { ELEMENT_ICONS, RARITY_COLORS, POKEBALLS, EMOJIS, RARITY_CONFIG } from './Constants.mjs'; 
-
-// --- IMPORT TỪ CATCH SYSTEM ---
+import { RARITY_CONFIG } from './Constants.mjs'; 
 import { showCatchBallInterface, handleCatchAction } from './CatchSystem.mjs';
 
 const PET_XP_BASE = 100;
@@ -23,68 +20,56 @@ const DEATH_COOLDOWN = 10 * 60 * 1000; // 10 Phút
 export const activeBattles = new Map(); 
 const pendingChallenges = new Map();
 
-// [EXPORT] Hàm tính tỷ lệ bắt (Dùng RARITY_CONFIG từ Constants để tránh NaN)
-export function calculateCatchRate(playerPet, wildPet) {
-    // Lấy config từ Constants, nếu không có thì mặc định Common
-    const rarityData = RARITY_CONFIG[wildPet.rarity] || RARITY_CONFIG['Common'];
-    
-    // Sử dụng ballRate từ config (Ví dụ: Common là 0.5)
-    let baseRate = rarityData.ballRate || 0.5; 
-
-    // Level chênh lệch: Pet mình cao hơn -> Tăng tỷ lệ
-    const levelDiff = playerPet.level - wildPet.level;
-    let levelBonus = Math.max(-0.2, Math.min(0.2, levelDiff * 0.02)); 
-    
-    // Máu càng thấp càng dễ bắt
-    const hpPercent = wildPet.currentHP / wildPet.getStats().HP;
-    let hpBonus = (1 - hpPercent) * 0.3; 
-
-    // Tỷ lệ tối thiểu 1%, tối đa 100%
-    return Math.max(0.01, Math.min(1.0, baseRate + levelBonus + hpBonus));
-}
-
-// --- HỆ THỐNG THỜI TIẾT ---
-const WEATHER_DATA = {
-    'SUNNY': { name: '☀️ Nắng Gắt', buff: ['Fire', 'Light'], nerf: ['Water', 'Dark'], desc: 'Buff Fire/Light, Nerf Water/Dark.' },
-    'RAINY': { name: '🌧️ Mưa Rào', buff: ['Water', 'Ice'], nerf: ['Fire', 'Earth'], desc: 'Buff Water/Ice, Nerf Fire/Earth.' },
-    'SANDSTORM': { name: '🌪️ Bão Cát', buff: ['Earth', 'Rock'], nerf: ['Wind', 'Lightning'], desc: 'Buff Earth/Rock, Nerf Wind/Lightning.' },
-    'CLEAR': { name: '☁️ Trời Quang', buff: [], nerf: [], desc: 'Không hiệu ứng.' }
-};
-
-let globalRaidManager = null;
-export function setRaidManagerRef(manager) {
-    globalRaidManager = manager;
-    console.log("✅ BattleManager đã kết nối với RaidBossManager.");
-}
-
 // ==========================================
-// 1. HELPERS & SAFE UI (FIX LỖI DISCORD)
+// 1. HELPERS & SAFE UI (FIXED)
 // ==========================================
 
-// [EXPORT] Hàm cập nhật giao diện an toàn: Tự chọn update hoặc editReply
+// [FIX QUAN TRỌNG] Logic an toàn tuyệt đối cho SafeUI
 export async function safeUpdateInterface(interaction, payload) {
     try {
+        // Kiểm tra trạng thái thực tế của interaction
         if (interaction.deferred || interaction.replied) {
-            await interaction.editReply(payload);
+            return await interaction.editReply(payload);
         } else {
-            await interaction.update(payload);
+            // Nếu chưa defer/reply, phải dùng update (cho button) hoặc reply
+            // Ở đây mặc định là update cho các nút bấm
+            return await interaction.update(payload);
         }
     } catch (e) {
-        // Bỏ qua lỗi nếu interaction đã hết hạn
-        if (e.code !== 10062 && e.code !== 'InteractionNotReplied') {
-            console.error("Lỗi SafeUI:", e.message);
+        // Xử lý các mã lỗi cụ thể
+        if (e.code === 40060 || e.code === 'InteractionAlreadyReplied') {
+            // Đã trả lời rồi mà không biết -> Cố gắng edit
+            try { return await interaction.editReply(payload); } catch (err) {}
+        } 
+        else if (e.code === 'InteractionNotReplied') {
+            // Chưa trả lời mà lại gọi edit -> Cố gắng update
+            try { return await interaction.update(payload); } catch (err) {}
+        }
+        else if (e.code !== 10062) { // 10062 = Unknown Interaction (Hết hạn)
+             console.error("SafeUI Error:", e.message);
         }
     }
 }
 
-// Hàm Defer an toàn
+// [FIX] Hàm Defer an toàn
 async function safeDefer(interaction, type = 'update') {
     try {
         if (!interaction.deferred && !interaction.replied) {
             if (type === 'update') await interaction.deferUpdate();
             else await interaction.deferReply();
         }
-    } catch (e) { /* Ignore */ }
+    } catch (e) { /* Bỏ qua lỗi */ }
+}
+
+// [EXPORT] Hàm tính tỷ lệ bắt 
+export function calculateCatchRate(playerPet, wildPet) {
+    const rarityData = RARITY_CONFIG[wildPet.rarity] || RARITY_CONFIG['Common'];
+    let baseRate = rarityData.ballRate || 0.5; 
+    const levelDiff = playerPet.level - wildPet.level;
+    let levelBonus = Math.max(-0.2, Math.min(0.2, levelDiff * 0.02)); 
+    const hpPercent = wildPet.currentHP / wildPet.getStats().HP;
+    let hpBonus = (1 - hpPercent) * 0.3; 
+    return Math.max(0.01, Math.min(1.0, baseRate + levelBonus + hpBonus));
 }
 
 function createStatusBar(current, max, color = 'HP') {
@@ -130,6 +115,20 @@ export async function removePetFromWorld(petId, client) {
     }
 }
 
+// --- HỆ THỐNG THỜI TIẾT & RAID ---
+const WEATHER_DATA = {
+    'SUNNY': { name: '☀️ Nắng Gắt', buff: ['Fire', 'Light'], nerf: ['Water', 'Dark'], desc: 'Buff Fire/Light, Nerf Water/Dark.' },
+    'RAINY': { name: '🌧️ Mưa Rào', buff: ['Water', 'Ice'], nerf: ['Fire', 'Earth'], desc: 'Buff Water/Ice, Nerf Fire/Earth.' },
+    'SANDSTORM': { name: '🌪️ Bão Cát', buff: ['Earth', 'Rock'], nerf: ['Wind', 'Lightning'], desc: 'Buff Earth/Rock, Nerf Wind/Lightning.' },
+    'CLEAR': { name: '☁️ Trời Quang', buff: [], nerf: [], desc: 'Không hiệu ứng.' }
+};
+
+let globalRaidManager = null;
+export function setRaidManagerRef(manager) {
+    globalRaidManager = manager;
+    console.log("✅ BattleManager đã kết nối với RaidBossManager.");
+}
+
 // ==========================================
 // 2. ROUTER & INIT
 // ==========================================
@@ -143,7 +142,6 @@ export async function startAdventure(interaction, difficulty) {
     
     const petIndex = userData.activePetIndex || 0;
 
-    // Defer ngay lập tức
     await safeDefer(interaction, 'reply');
     await startBattleLogic(interaction, userId, userData, petIndex, 'adventure', difficulty);
 }
@@ -167,7 +165,6 @@ export async function createPvPChallenge(interaction, opponent) {
 }
 
 async function startBattleLogic(interaction, userId, userData, petIndex, type, param) {
-    // Đảm bảo đã defer
     await safeDefer(interaction, 'reply');
 
     if (!userData.pets[petIndex]) {
@@ -201,7 +198,6 @@ async function startBattleLogic(interaction, userId, userData, petIndex, type, p
         turn: 1, logs: ["⚔️ **Trận đấu bắt đầu!**"]
     });
 
-    // Tạo tin nhắn ban đầu
     try {
         const msg = await interaction.editReply({ content: "🔥 Đang vào trận...", components: [] });
         const battle = activeBattles.get(userId);
@@ -212,7 +208,7 @@ async function startBattleLogic(interaction, userId, userData, petIndex, type, p
 }
 
 // ==================================================================
-// 3. ROUTER XỬ LÝ TƯƠNG TÁC
+// 3. XỬ LÝ TƯƠNG TÁC
 // ==================================================================
 
 export async function handleInteraction(interaction) {
@@ -228,7 +224,7 @@ export async function handleInteraction(interaction) {
         }
     }
 
-    // 1. KHIÊU CHIẾN
+    // 1. KHIÊU CHIẾN (CHALLENGE)
     if (customId.startsWith('challenge_')) {
         const petId = customId.replace('challenge_', '');
         let info = null;
@@ -256,6 +252,7 @@ export async function handleInteraction(interaction) {
         const userData = Database.getUser(uid);
         if (!userData.pets.length) return interaction.reply({ content: "🚫 Cần có Pet!", flags: [MessageFlags.Ephemeral] });
 
+        // Defer Reply ở đây (Vì đây là bắt đầu trận mới)
         await safeDefer(interaction, 'reply');
         
         const petIndex = userData.activePetIndex || 0;
@@ -266,7 +263,8 @@ export async function handleInteraction(interaction) {
     // 2. PVP
     if (customId.startsWith('pvp_')) {
         const battle = activeBattles.get(uid);
-        // Defer nếu cần
+        
+        // Chỉ Defer Update cho skill/surrender
         if (customId.startsWith('pvp_skill_') || customId.startsWith('pvp_surrender')) {
              await safeDefer(interaction, 'update');
         }
@@ -275,7 +273,7 @@ export async function handleInteraction(interaction) {
         else if (customId.startsWith('pvp_accept_')) await startPvPMatch(interaction, customId.replace('pvp_accept_', ''));
         else if (customId.startsWith('pvp_decline_')) {
              pendingChallenges.delete(customId.replace('pvp_decline_', ''));
-             await interaction.editReply({content:"Đã từ chối", embeds:[], components:[]});
+             await safeUpdateInterface(interaction, {content:"Đã từ chối", embeds:[], components:[]});
         }
         else if (customId.startsWith('pvp_surrender')) {
              if(battle) endPvP(interaction, battle, battle.p1.id === uid ? battle.p2 : battle.p1);
@@ -283,17 +281,22 @@ export async function handleInteraction(interaction) {
         return;
     }
 
-    // 3. PVE (BATTLE & CATCH)
+    // 3. PVE & CATCH
     const battle = activeBattles.get(uid);
 
-    // [SAFE DEFER] Tự động Defer cho các nút PvE, TRỪ các nút chuyển giao diện CatchSystem
-    // Vì CatchSystem xử lý giao diện riêng, ta để nó tự xử lý hoặc defer trong đó
-    if (!['btn_select_ball', 'ball_', 'btn_cancel_catch'].some(prefix => customId.startsWith(prefix))) {
+    // [QUAN TRỌNG] Danh sách KHÔNG Auto-Defer
+    const noAutoDeferPrefixes = ['btn_select_ball', 'ball_', 'btn_cancel_catch', 'challenge_', 'pvp_'];
+    
+    if (!noAutoDeferPrefixes.some(prefix => customId.startsWith(prefix))) {
         await safeDefer(interaction, 'update');
     }
 
     if (!battle && !['btn_claim', 'btn_defeat'].includes(customId)) {
-          return interaction.editReply({ content: "Hết phiên chiến đấu.", embeds: [], components: [] });
+          try {
+            if (interaction.deferred) await interaction.editReply({ content: "Hết phiên chiến đấu.", components: [] });
+            else await interaction.reply({ content: "Hết phiên chiến đấu.", flags: [MessageFlags.Ephemeral] });
+          } catch(e) {}
+          return;
     }
     
     // === ROUTING ===
@@ -318,7 +321,6 @@ export async function handleInteraction(interaction) {
     else if (customId.startsWith('btn_heal')) await handleHealAction(interaction, battle);
     else if (customId.startsWith('btn_mana')) await handleManaAction(interaction, battle);
 }
-
 
 // ==================================================================
 // 4. LOGIC PVE & VIEW
@@ -370,21 +372,17 @@ export async function showPvEInterface(interaction, uid) {
         new ButtonBuilder().setCustomId(`btn_run_${uid}`).setLabel('🏃 Bỏ Chạy').setStyle(ButtonStyle.Danger)
     );
 
-    // Nút Thu Phục (Chỉ hiện khi: Wild Battle + Không phải Boss + Còn sống)
     if (battle.type === 'wild' && wildPet.rarity !== 'Boss' && wildPet.rarity !== 'RaidBoss' && wildPet.currentHP > 0) {
-        const catchRate = calculateCatchRate(playerPet, wildPet);
         row2.addComponents(
             new ButtonBuilder()
                 .setCustomId(`btn_select_ball_${uid}`) 
-                .setLabel(`Thu phục (${Math.round(catchRate * 100)}%)`) 
-                .setEmoji('🔴') 
+                .setLabel(`Thu phục`) 
+                .setEmoji('<a:Master:1441451727348830460>') 
                 .setStyle(ButtonStyle.Secondary)
         );
     }
 
     const payload = { embeds: [embed], components: [row1, row2] };
-    
-    // Dùng Safe Update
     await safeUpdateInterface(interaction, payload);
 }
 
@@ -393,9 +391,8 @@ async function processPvETurn(interaction, skillIndex, battle) {
     battle.logs = []; 
     const pSkillId = (playerPet.skills || ['S1'])[skillIndex];
     const pSkill = getSkillById(pSkillId);
-    if (!pSkill) return interaction.editReply({ content: "Lỗi skill!" });
+    if (!pSkill) return safeUpdateInterface(interaction, { content: "Lỗi skill!" });
 
-    // Player Action
     battle.logs.push(...playerPet.processTurnEffects().log);
     if (playerPet.currentHP <= 0) return handlePvEEndActions(interaction, 'btn_defeat', interaction.client);
 
@@ -534,7 +531,7 @@ async function handleRunAction(interaction, battle) {
     const rate = 0.5 + (battle.playerPet.getStats().SPD / battle.wildPet.getStats().SPD) * 0.2;
     if (Math.random() < rate) {
         activeBattles.delete(interaction.user.id);
-        return interaction.editReply({ content: "🏃 **Chạy thành công!**", embeds: [], components: [] });
+        return safeUpdateInterface(interaction, { content: "🏃 **Chạy thành công!**", embeds: [], components: [] });
     }
     battle.logs = ["❌ **Chạy thất bại!**"];
     await processEnemyTurn(interaction, battle);
@@ -579,7 +576,6 @@ async function showPvEVictory(interaction, battle) {
 
 async function handlePvEEndActions(interaction, customId, client) {
     const userId = interaction.user.id;
-    
     await safeDefer(interaction, 'update');
 
     const tempBattle = activeBattles.get(userId);
@@ -588,7 +584,7 @@ async function handlePvEEndActions(interaction, customId, client) {
 
     if (!targetPetId) {
         for (const [pid, info] of activeWildPets.entries()) {
-             if (info.messageId === interaction.message.id) { targetPetId = pid; break; }
+             if (interaction.message && info.messageId === interaction.message.id) { targetPetId = pid; break; }
         }
     }
 
@@ -604,11 +600,11 @@ async function handlePvEEndActions(interaction, customId, client) {
             userData.pets[pIdx].deathTime = Date.now();
             Database.updateUser(userId, userData);
         }
-        return interaction.editReply({ content: "💀 **THẤT BẠI!** Pet đã trọng thương (Nghỉ 10p).", embeds: [], components: [] });
+        return safeUpdateInterface(interaction, { content: "💀 **THẤT BẠI!** Pet đã trọng thương (Nghỉ 10p).", embeds: [], components: [] });
     }
 
     if (customId === 'btn_claim') {
-        await interaction.editReply({ content: "✅ Xong.", embeds: [], components: [] });
+        await safeUpdateInterface(interaction, { content: "✅ Xong.", embeds: [], components: [] });
     } 
 
     if (targetPetId && customId === 'btn_claim' && tempBattle?.type === 'wild') {
@@ -704,7 +700,7 @@ async function processPvPTurn(interaction, idx, battle) {
 
     if (def.pet.currentHP <= 0) {
         activeBattles.delete(battle.p1.id); activeBattles.delete(battle.p2.id);
-        return interaction.editReply({ content: `🏆 **${atk.user.username}** thắng!`, embeds: [], components: [] });
+        return safeUpdateInterface(interaction, { content: `🏆 **${atk.user.username}** thắng!`, embeds: [], components: [] });
     }
     battle.turnOwner = def.id;
     await updatePvPInterface(interaction, battle);  
@@ -712,5 +708,5 @@ async function processPvPTurn(interaction, idx, battle) {
 
 async function endPvP(interaction, battle, winner) {
     activeBattles.delete(battle.p1.id); activeBattles.delete(battle.p2.id);
-    await interaction.editReply({ content: `🏆 **${winner.user.username}** thắng (đối thủ đầu hàng)!`, embeds: [], components: [] });
+    await safeUpdateInterface(interaction, { content: `🏆 **${winner.user.username}** thắng (đối thủ đầu hàng)!`, embeds: [], components: [] });
 }
