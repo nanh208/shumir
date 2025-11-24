@@ -9,7 +9,9 @@ export const EMOJIS = {
         '<a:Keqing:1440702273801027695>', '<a:Paimon:1440702251302781040>',
         '<a:baf5c89c099b34decb7f4507b5144366:1440702202762231828>', '<a:hutao:1434904266597732473>',
         '<a:Klee:1434903983323086939>', '<a:Rem:1434903876590637086>',"<a:Mewtwu:1441834826549170399>","<a:Miraidon:1442116383986159757>"
-        ,"<:anhthem:1442335745879572643>"
+        ,"<:anhthem:1442335745879572643>","<a:FireflyGIF:1442489570871480410>","<a:SunSolgaleoGIFbyPokmon:1442460810474684486>",
+        "<a:ShadowsHelloGIFbyPokmon:1442460747648209027>","<a:FlyingPokemonTcgGIFbyPokmon:1442460691146477628>",
+        "<a:deathnoteGIF:1442460645931880448>"
     ],
     CANDY_NORMAL: '🍬',
     CANDY_HIGH: '🍭',

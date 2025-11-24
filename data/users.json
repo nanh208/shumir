@@ -86,11 +86,11 @@
           "SPD": 95
         },
         "level": 8,
-        "xp": 17,
+        "xp": 202,
         "gen": 79,
         "statPoints": 18,
-        "currentHP": 3995,
-        "currentMP": 1687,
+        "currentHP": 4053,
+        "currentMP": 1732,
         "skills": [
           "S1",
           "ice_debuff_2",
@@ -165,12 +165,12 @@
     ],
     "inventory": {
       "candies": {
-        "normal": 10174,
+        "normal": 10175,
         "high": 10001,
         "super": 9999,
         "ultra": 9999
       },
-      "potions": 1062,
+      "potions": 1064,
       "crates": {
         "common": 99,
         "mythic": 99
@@ -191,10 +191,10 @@
         "master": 984
       }
     },
-    "gold": 9999708,
+    "gold": 9999838,
     "codesRedeemed": [],
     "hasClaimedStarter": true,
-    "activePetIndex": 0,
+    "activePetIndex": 2,
     "createdAt": 1763782813353
   },
   "1185865935874162830": {
@@ -216,7 +216,7 @@
           "SPD": 1200
         },
         "level": 95,
-        "xp": 3784,
+        "xp": 5296,
         "gen": 98,
         "statPoints": 0,
         "currentHP": 273120,
@@ -731,9 +731,9 @@
         "super": 9999,
         "ultra": 9999
       },
-      "potions": 1004,
+      "potions": 1006,
       "crates": {
-        "common": 99,
+        "common": 101,
         "mythic": 99
       },
       "skillBooks": [
@@ -752,7 +752,7 @@
         "master": 0
       }
     },
-    "gold": 9992999,
+    "gold": 9993280,
     "codesRedeemed": [],
     "hasClaimedStarter": true,
     "activePetIndex": 0,
