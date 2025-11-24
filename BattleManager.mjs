@@ -752,3 +752,85 @@ async function endPvP(interaction, battle, winner) {
         embeds: [], components: [] 
     });
 }
+// ... (Các hàm khác bên trên)
+
+async function handlePvEEndActions(interaction, customId, client) {
+    const userId = interaction.user.id;
+    await safeDefer(interaction, 'update');
+
+    const tempBattle = activeBattles.get(userId);
+    let targetPetId = tempBattle ? tempBattle.wildPetId : null;
+    let playerPetData = tempBattle ? tempBattle.playerPet : null;
+
+    // Cố gắng tìm Pet ID từ tin nhắn nếu battle state đã mất
+    if (!targetPetId) {
+        for (const [pid, info] of activeWildPets.entries()) {
+             if (interaction.message && info.messageId === interaction.message.id) { 
+                 targetPetId = pid; 
+                 break; 
+             }
+        }
+    }
+
+    // 1. Xử lý khi bấm nút THẤT BẠI (Defeat)
+    if (customId === 'btn_defeat') {
+        activeBattles.delete(userId); // Xóa trạng thái chiến đấu
+        
+        // Nếu là pet hoang dã, trả lại trạng thái tự do để người khác đánh
+        if (targetPetId) {
+            const info = activeWildPets.get(targetPetId);
+            if(info) { 
+                info.isBattling = false; 
+                activeWildPets.set(targetPetId, info); 
+            }
+        }
+
+        // Đánh dấu Pet của người chơi bị thương (Cooldown)
+        const userData = Database.getUser(userId);
+        // Tìm pet đang active để set cooldown
+        if (userData.activePetIndex !== undefined && userData.pets[userData.activePetIndex]) {
+            userData.pets[userData.activePetIndex].deathTime = Date.now();
+            userData.pets[userData.activePetIndex].currentHP = 0; // Về 0 máu
+            Database.updateUser(userId, userData);
+        }
+
+        return safeUpdateInterface(interaction, { 
+            content: "💀 **THẤT BẠI!** Pet đã trọng thương (Cần nghỉ ngơi 10 phút hoặc dùng thuốc hồi phục).", 
+            embeds: [], 
+            components: [] 
+        });
+    }
+
+    // 2. Xử lý khi bấm nút THU THẬP (Claim - Chiến thắng)
+    if (customId === 'btn_claim') {
+        await safeUpdateInterface(interaction, { 
+            content: "✅ **Đã thu thập chiến lợi phẩm!**", 
+            embeds: [], 
+            components: [] 
+        });
+    } 
+
+    // Xóa Pet hoang dã khỏi thế giới nếu đã chiến thắng và nhận quà
+    if (targetPetId && customId === 'btn_claim' && tempBattle?.type === 'wild') {
+        // Gọi hàm removePetFromWorld (được import từ SpawnSystem hoặc định nghĩa trong file này)
+        // Lưu ý: Đảm bảo hàm này tồn tại. Nếu trong file này chưa có, dùng logic import
+        try {
+            const { removePetFromWorld } = await import('./SpawnSystem.mjs');
+            await removePetFromWorld(targetPetId, client); 
+        } catch (e) {
+            // Fallback nếu import lỗi (xóa thủ công)
+            const info = activeWildPets.get(targetPetId);
+            if (info) {
+                try {
+                    const channel = await client.channels.fetch(info.channelId);
+                    const msg = await channel.messages.fetch(info.messageId);
+                    if (msg) await msg.delete();
+                } catch(err) {}
+                activeWildPets.delete(targetPetId);
+            }
+        }
+    }
+    
+    // Dọn dẹp battle lần cuối
+    activeBattles.delete(userId);
+}

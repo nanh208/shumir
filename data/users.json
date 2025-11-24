@@ -165,12 +165,12 @@
     ],
     "inventory": {
       "candies": {
-        "normal": 10171,
-        "high": 9999,
+        "normal": 10174,
+        "high": 10001,
         "super": 9999,
         "ultra": 9999
       },
-      "potions": 1060,
+      "potions": 1062,
       "crates": {
         "common": 99,
         "mythic": 99
@@ -191,7 +191,7 @@
         "master": 984
       }
     },
-    "gold": 9999999,
+    "gold": 9999708,
     "codesRedeemed": [],
     "hasClaimedStarter": true,
     "activePetIndex": 0,
@@ -319,6 +319,409 @@
         ],
         "activeEffects": [],
         "passive": "CRIT_MASTER"
+      },
+      {
+        "id": "micv0ha9c2u7l3xopf6",
+        "name": "Knight",
+        "nickname": "Knight",
+        "icon": "<a:pikachu:1440702320290824364>",
+        "element": "Dark",
+        "race": "Human",
+        "rarity": "Legendary",
+        "baseStats": {
+          "HP": 1100,
+          "MP": 450,
+          "ATK": 1150,
+          "SATK": 900,
+          "DEF": 1050,
+          "SPD": 95
+        },
+        "level": 2,
+        "xp": 0,
+        "gen": 85,
+        "statPoints": 0,
+        "currentHP": 3023,
+        "currentMP": 1244,
+        "skills": [
+          "S1",
+          "phy_05",
+          "dra_debuff_3",
+          "gra_shield_4"
+        ],
+        "activeEffects": [],
+        "passive": "VAMPIRISM"
+      },
+      {
+        "id": "micv1hutps1hrzzavda",
+        "name": "Pika-Chu",
+        "nickname": "Pika-Chu",
+        "icon": "<a:Paimon:1440702251302781040>",
+        "element": "Fire",
+        "race": "Beast",
+        "rarity": "Common",
+        "baseStats": {
+          "HP": 1000,
+          "MP": 500,
+          "ATK": 1050,
+          "SATK": 1100,
+          "DEF": 1000,
+          "SPD": 120
+        },
+        "level": 4,
+        "xp": 0,
+        "gen": 84,
+        "statPoints": 0,
+        "currentHP": 1153,
+        "currentMP": 585,
+        "skills": [
+          "S1",
+          "dra_phy_1",
+          "ice_debuff_1",
+          "dra_mag_1"
+        ],
+        "activeEffects": [],
+        "passive": "BERSEKER"
+      },
+      {
+        "id": "micv2snky0ylc4v7i0m",
+        "name": "Dragonoid",
+        "nickname": "Dragonoid",
+        "icon": "<a:kiuri:1441632663126540459>",
+        "element": "Electric",
+        "race": "Dragon",
+        "rarity": "Common",
+        "baseStats": {
+          "HP": 1200,
+          "MP": 600,
+          "ATK": 1250,
+          "SATK": 1250,
+          "DEF": 1100,
+          "SPD": 100
+        },
+        "level": 2,
+        "xp": 0,
+        "gen": 71,
+        "statPoints": 0,
+        "currentHP": 1306,
+        "currentMP": 655,
+        "skills": [
+          "S1",
+          "ear_heal_1",
+          "dra_buff_1",
+          "fir_debuff_1"
+        ],
+        "activeEffects": [],
+        "passive": "CRIT_MASTER"
+      },
+      {
+        "id": "micv3pux99153qpemtw",
+        "name": "King Slime",
+        "nickname": "King Slime",
+        "icon": "<a:Keqing:1440702273801027695>",
+        "element": "Fire",
+        "race": "Elemental",
+        "rarity": "Common",
+        "baseStats": {
+          "HP": 3500,
+          "MP": 1200,
+          "ATK": 2800,
+          "SATK": 2500,
+          "DEF": 3000,
+          "SPD": 110
+        },
+        "level": 3,
+        "xp": 0,
+        "gen": 14,
+        "statPoints": 0,
+        "currentHP": 3004,
+        "currentMP": 1035,
+        "skills": [
+          "S1",
+          "phy_01",
+          "phy_03",
+          "fir_ball_1"
+        ],
+        "activeEffects": [],
+        "passive": "VAMPIRISM"
+      },
+      {
+        "id": "micv42suxlqtxwfguxs",
+        "name": "Spirit",
+        "nickname": "Spirit",
+        "icon": "<a:kiuri:1441632663126540459>",
+        "element": "Ice",
+        "race": "Elf",
+        "rarity": "Rare",
+        "baseStats": {
+          "HP": 900,
+          "MP": 800,
+          "ATK": 1000,
+          "SATK": 1300,
+          "DEF": 950,
+          "SPD": 110
+        },
+        "level": 2,
+        "xp": 0,
+        "gen": 72,
+        "statPoints": 0,
+        "currentHP": 1476,
+        "currentMP": 1313,
+        "skills": [
+          "S1",
+          "dar_damage_2",
+          "ele_stun_1",
+          "phy_34"
+        ],
+        "activeEffects": [],
+        "passive": "BERSEKER"
+      },
+      {
+        "id": "micv4x6s7qzmeo5a8ym",
+        "name": "Shadow",
+        "nickname": "Shadow",
+        "icon": "<a:hutao:1434904266597732473>",
+        "element": "Electric",
+        "race": "Unknown",
+        "rarity": "Rare",
+        "baseStats": {
+          "HP": 1000,
+          "MP": 500,
+          "ATK": 1300,
+          "SATK": 1100,
+          "DEF": 1000,
+          "SPD": 115
+        },
+        "level": 5,
+        "xp": 0,
+        "gen": 78,
+        "statPoints": 0,
+        "currentHP": 1701,
+        "currentMP": 867,
+        "skills": [
+          "S1",
+          "lig_debuff_3",
+          "ear_blast_2",
+          "ice_stun_1"
+        ],
+        "activeEffects": [],
+        "passive": "REGEN"
+      },
+      {
+        "id": "micv559uvbf9gth35xa",
+        "name": "Shadow",
+        "nickname": "Shadow",
+        "icon": "<a:Keqing:1440702273801027695>",
+        "element": "Electric",
+        "race": "Unknown",
+        "rarity": "Uncommon",
+        "baseStats": {
+          "HP": 1000,
+          "MP": 500,
+          "ATK": 1300,
+          "SATK": 1100,
+          "DEF": 1000,
+          "SPD": 115
+        },
+        "level": 4,
+        "xp": 0,
+        "gen": 100,
+        "statPoints": 0,
+        "currentHP": 1461,
+        "currentMP": 741,
+        "skills": [
+          "S1",
+          "win_debuff_1",
+          "phy_29",
+          "lig_heal_1"
+        ],
+        "activeEffects": [],
+        "passive": "EVASION"
+      },
+      {
+        "id": "micv5ew589legkn0g04",
+        "name": "Pika-Chu",
+        "nickname": "Pika-Chu",
+        "icon": "<a:Miraidon:1442116383986159757>",
+        "element": "Dragon",
+        "race": "Beast",
+        "rarity": "Epic",
+        "baseStats": {
+          "HP": 1000,
+          "MP": 500,
+          "ATK": 1050,
+          "SATK": 1100,
+          "DEF": 1000,
+          "SPD": 120
+        },
+        "level": 3,
+        "xp": 0,
+        "gen": 98,
+        "statPoints": 0,
+        "currentHP": 2167,
+        "currentMP": 1094,
+        "skills": [
+          "S1",
+          "dra_mag_3",
+          "lig_buff_4",
+          "lig_debuff_1"
+        ],
+        "activeEffects": [],
+        "passive": "BERSEKER"
+      },
+      {
+        "id": "micv6hgdsgsxullog1k",
+        "name": "Wisp",
+        "nickname": "Wisp",
+        "icon": "<a:baf5c89c099b34decb7f4507b5144366:1440702202762231828>",
+        "element": "Fire",
+        "race": "Elemental",
+        "rarity": "Common",
+        "baseStats": {
+          "HP": 800,
+          "MP": 700,
+          "ATK": 1200,
+          "SATK": 1300,
+          "DEF": 850,
+          "SPD": 130
+        },
+        "level": 3,
+        "xp": 0,
+        "gen": 60,
+        "statPoints": 0,
+        "currentHP": 842,
+        "currentMP": 738,
+        "skills": [
+          "S1",
+          "phy_21",
+          "wat_heal_1",
+          "phy_23"
+        ],
+        "activeEffects": [],
+        "passive": "CRIT_MASTER"
+      },
+      {
+        "id": "micv70m0susbsj95e8i",
+        "name": "Wisp",
+        "nickname": "Wisp",
+        "icon": "<a:Paimon:1440702251302781040>",
+        "element": "Fire",
+        "race": "Elemental",
+        "rarity": "Common",
+        "baseStats": {
+          "HP": 800,
+          "MP": 700,
+          "ATK": 1200,
+          "SATK": 1300,
+          "DEF": 850,
+          "SPD": 130
+        },
+        "level": 3,
+        "xp": 0,
+        "gen": 89,
+        "statPoints": 0,
+        "currentHP": 936,
+        "currentMP": 820,
+        "skills": [
+          "S1",
+          "lig_damage_1",
+          "phy_01",
+          "wat_blast_1"
+        ],
+        "activeEffects": [],
+        "passive": "CRIT_MASTER"
+      },
+      {
+        "id": "micv77ptd9yq0gmpm4i",
+        "name": "Shadow",
+        "nickname": "Shadow",
+        "icon": "<a:pikachu:1440702320290824364>",
+        "element": "Grass",
+        "race": "Unknown",
+        "rarity": "Epic",
+        "baseStats": {
+          "HP": 1000,
+          "MP": 500,
+          "ATK": 1300,
+          "SATK": 1100,
+          "DEF": 1000,
+          "SPD": 115
+        },
+        "level": 1,
+        "xp": 0,
+        "gen": 78,
+        "statPoints": 0,
+        "currentHP": 2001,
+        "currentMP": 1000,
+        "skills": [
+          "S1",
+          "ice_blast_1",
+          "ice_blast_4",
+          "ear_def_3"
+        ],
+        "activeEffects": [],
+        "passive": "REGEN"
+      },
+      {
+        "id": "micv7fqh5dda98ps30n",
+        "name": "King Slime",
+        "nickname": "King Slime",
+        "icon": "<a:Keqing:1440702273801027695>",
+        "element": "Light",
+        "race": "Elemental",
+        "rarity": "Uncommon",
+        "baseStats": {
+          "HP": 3500,
+          "MP": 1200,
+          "ATK": 2800,
+          "SATK": 2500,
+          "DEF": 3000,
+          "SPD": 110
+        },
+        "level": 4,
+        "xp": 0,
+        "gen": 74,
+        "statPoints": 0,
+        "currentHP": 4622,
+        "currentMP": 1597,
+        "skills": [
+          "S1",
+          "phy_28",
+          "ele_satk_1",
+          "ele_spd_2"
+        ],
+        "activeEffects": [],
+        "passive": "VAMPIRISM"
+      },
+      {
+        "id": "micv7njm7abvof5hvxh",
+        "name": "Wisp",
+        "nickname": "Wisp",
+        "icon": "<a:Keqing:1440702273801027695>",
+        "element": "Wind",
+        "race": "Elemental",
+        "rarity": "Rare",
+        "baseStats": {
+          "HP": 800,
+          "MP": 700,
+          "ATK": 1200,
+          "SATK": 1300,
+          "DEF": 850,
+          "SPD": 130
+        },
+        "level": 4,
+        "xp": 0,
+        "gen": 71,
+        "statPoints": 0,
+        "currentHP": 1325,
+        "currentMP": 1162,
+        "skills": [
+          "S1",
+          "win_nuke_2",
+          "wat_blast_2",
+          "fir_dot_2"
+        ],
+        "activeEffects": [],
+        "passive": "VAMPIRISM"
       }
     ],
     "inventory": {
@@ -349,7 +752,7 @@
         "master": 0
       }
     },
-    "gold": 9999999,
+    "gold": 9992999,
     "codesRedeemed": [],
     "hasClaimedStarter": true,
     "activePetIndex": 0,
