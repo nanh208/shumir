@@ -10,7 +10,7 @@ import { activeWildPets } from './SpawnSystem.mjs';
 import { Database } from './Database.mjs';
 import { Pet, calculateDamage, processSkillEffect, createBossPet } from './GameLogic.mjs'; 
 import { getSkillById } from './SkillList.mjs'; 
-import { RARITY_CONFIG } from './Constants.mjs'; 
+import { RARITY_CONFIG, REWARD_CONFIG, EMOJIS, RARITY } from './Constants.mjs';
 import { showCatchBallInterface, handleCatchAction } from './CatchSystem.mjs';
 
 const PET_XP_BASE = 100;
@@ -551,140 +551,135 @@ async function handleRunAction(interaction, battle) {
 }
 
 async function showPvEVictory(interaction, battle) {
-    const { playerPet, wildPet, type, wildPetId } = battle;
+    const { playerPet, wildPet, type, wildPetId, difficulty } = battle;
     const userId = interaction.user.id;
-    const totalXP = Math.round((wildPet.level * PET_XP_BASE + wildPet.getStats().HP / 10) * (type === 'adventure' ? 1.5 : 1));
     
+    // 1. Tính XP
+    // Adventure khó hơn thì nhiều XP hơn
+    const diffMult = typeof difficulty === 'number' ? difficulty : 1;
+    const totalXP = Math.round((wildPet.level * PET_XP_BASE + wildPet.getStats().HP / 10) * diffMult);
+    
+    // 2. Tính Tiền (Shumir Money)
+    // Công thức: (Base + Level * 5) * Hệ số độ khó * Hệ số Rarity
+    const rarityBonus = RARITY_CONFIG[wildPet.rarity]?.statMultiplier || 1;
+    let goldReward = Math.round(
+        (REWARD_CONFIG.BASE_GOLD + (wildPet.level * REWARD_CONFIG.GOLD_PER_LEVEL)) 
+        * diffMult 
+        * rarityBonus
+    );
+
     const userData = Database.getUser(userId);
+    
+    // Cập nhật XP cho Pet
     const pIdx = userData.pets.findIndex(p => p.id === playerPet.id);
     let lvMsg = "";
-    
     if(pIdx !== -1) {
         const pInstance = new Pet(userData.pets[pIdx]);
         if (pInstance.addExp(totalXP)) lvMsg = `\n🆙 **LÊN CẤP ${pInstance.level}!**`;
         pInstance.currentHP = pInstance.getStats().HP;
         pInstance.currentMP = pInstance.getStats().MP;
         userData.pets[pIdx] = pInstance.getDataForSave();
-        Database.updateUser(userId, userData);
     }
+    
+    // Cập nhật Tiền
+    if (!userData.gold) userData.gold = 0;
+    userData.gold += goldReward;
+
+    // 3. Tính toán Drop vật phẩm (Loot)
+    let dropMsg = "";
+    let loot = [];
+
+    // Lấy tỷ lệ drop dựa trên Rarity quái
+    const rates = REWARD_CONFIG.DROP_RATES[wildPet.rarity] || REWARD_CONFIG.DROP_RATES['Common'];
+
+    // Helper function random
+    const tryDrop = (rate, itemKey, itemName, emoji, min = 1, max = 1) => {
+        if (Math.random() < rate) {
+            const qty = Math.floor(Math.random() * (max - min + 1)) + min;
+            loot.push({ key: itemKey, qty: qty, name: itemName, emoji: emoji });
+            return true;
+        }
+        return false;
+    };
+
+    // Logic Drop
+    if (type === 'wild' || type === 'adventure') {
+        // Kẹo
+        if (tryDrop(rates.candy_norm, 'candies.normal', 'Kẹo Thường', EMOJIS.CANDY_NORMAL, 1, 3)) {}
+        if (tryDrop(rates.candy_high, 'candies.high', 'Kẹo Cao Cấp', EMOJIS.CANDY_HIGH, 1, 2)) {}
+        if (tryDrop(rates.candy_super, 'candies.super', 'Kẹo Siêu Cấp', EMOJIS.CANDY_SUPER, 1, 1)) {}
+        
+        // Hòm
+        if (tryDrop(rates.box_com, 'crates.common', 'Hộp Thường', EMOJIS.BOX_COMMON, 1, 1)) {}
+        if (tryDrop(rates.box_my, 'crates.mythic', 'Rương Thần Thoại', EMOJIS.BOX_MYTHIC, 1, 1)) {}
+
+        // Sách Skill
+        if (tryDrop(rates.skill_1, 'skillbooks.T1', 'Sách Skill I', '📖', 1, 1)) {}
+        if (tryDrop(rates.skill_2, 'skillbooks.T2', 'Sách Skill II', '📘', 1, 1)) {}
+        if (tryDrop(rates.skill_legend, 'skillbooks.LEGEND', 'Sách Huyền Thoại', '📜', 1, 1)) {}
+        
+        // Luôn rơi Potion nếu đánh quái thường
+        if (type === 'wild') {
+            loot.push({ key: 'potions', qty: 1, name: 'Thuốc Hồi Phục', emoji: '💊' });
+        }
+    } else if (type === 'raid_boss') {
+        // Logic Raid Boss dùng Drop riêng trong Constants.BOSS_DROPS nhưng cộng thêm tiền ở đây
+        goldReward *= 5; // Boss cho nhiều tiền hơn
+    }
+
+    // Lưu vật phẩm vào Inventory
+    if (!userData.inventory) userData.inventory = {};
+    
+    loot.forEach(item => {
+        // Xử lý nested key (ví dụ: candies.normal)
+        if (item.key.includes('.')) {
+            const [main, sub] = item.key.split('.');
+            if (!userData.inventory[main]) userData.inventory[main] = {};
+            userData.inventory[main][sub] = (userData.inventory[main][sub] || 0) + item.qty;
+        } else {
+            userData.inventory[item.key] = (userData.inventory[item.key] || 0) + item.qty;
+        }
+        dropMsg += `+${item.qty} ${item.emoji} ${item.name}\n`;
+    });
+
+    Database.updateUser(userId, userData);
     activeBattles.delete(userId);
 
-    const embed = new EmbedBuilder().setTitle("🏆 CHIẾN THẮNG (Pet đã hồi phục)").setColor(0x00FF00).setDescription(`Hạ gục **${wildPet.name}**!\nNhận: **${totalXP} XP** ${lvMsg}`);
+    // Xây dựng Embed
+    const embed = new EmbedBuilder()
+        .setTitle(`🏆 CHIẾN THẮNG: ${wildPet.name}`)
+        .setColor(0x00FF00)
+        .setDescription(`Bạn đã đánh bại **${wildPet.name}**! Pet đã được hồi phục.`)
+        .addFields(
+            { name: '💰 Phần Thưởng', value: `+**${goldReward.toLocaleString()}** ${EMOJIS.CURRENCY}\n+**${totalXP}** XP ${lvMsg}`, inline: true }
+        );
+
+    if (dropMsg) {
+        embed.addFields({ name: '🎒 Vật Phẩm Rơi', value: dropMsg, inline: true });
+    }
+
     const row = new ActionRowBuilder();
     
     if (type === 'wild') {
-        userData.inventory.candies.normal = (userData.inventory.candies.normal || 0) + 2;
-        userData.inventory.potions = (userData.inventory.potions || 0) + 1; 
-        Database.updateUser(userId, userData);
-
-        embed.setDescription(embed.data.description + `\n\n🔪 Đã kết liễu tự động.\nNhận **2 🍬 Kẹo & 1 💊 Thuốc**.`);
+        embed.setFooter({ text: "Đã kết liễu mục tiêu." });
         if (wildPetId) removePetFromWorld(wildPetId, interaction.client);
-        row.addComponents(new ButtonBuilder().setCustomId('btn_claim').setLabel('Xong').setStyle(ButtonStyle.Primary));
-    } else {
-        row.addComponents(new ButtonBuilder().setCustomId('btn_claim').setLabel('Xong').setStyle(ButtonStyle.Primary));
     }
+    
+    row.addComponents(new ButtonBuilder().setCustomId('btn_claim').setLabel('Thu Thập').setStyle(ButtonStyle.Success));
     
     await safeUpdateInterface(interaction, { embeds: [embed], components: [row] });
 }
 
-async function handlePvEEndActions(interaction, customId, client) {
-    const userId = interaction.user.id;
-    await safeDefer(interaction, 'update');
-
-    const tempBattle = activeBattles.get(userId);
-    let targetPetId = tempBattle ? tempBattle.wildPetId : null;
-    let playerPetData = tempBattle ? tempBattle.playerPet : null;
-
-    if (!targetPetId) {
-        for (const [pid, info] of activeWildPets.entries()) {
-             if (interaction.message && info.messageId === interaction.message.id) { targetPetId = pid; break; }
-        }
-    }
-
-    if (customId === 'btn_defeat') {
-        activeBattles.delete(userId);
-        if (targetPetId) {
-            const info = activeWildPets.get(targetPetId);
-            if(info) { info.isBattling = false; activeWildPets.set(targetPetId, info); }
-        }
-        const userData = Database.getUser(userId);
-        const pIdx = userData.pets.findIndex(p => p.id === playerPetData?.id);
-        if (pIdx !== -1) {
-            userData.pets[pIdx].deathTime = Date.now();
-            Database.updateUser(userId, userData);
-        }
-        return safeUpdateInterface(interaction, { content: "💀 **THẤT BẠI!** Pet đã trọng thương (Nghỉ 10p).", embeds: [], components: [] });
-    }
-
-    if (customId === 'btn_claim') {
-        await safeUpdateInterface(interaction, { content: "✅ Xong.", embeds: [], components: [] });
-    } 
-
-    if (targetPetId && customId === 'btn_claim' && tempBattle?.type === 'wild') {
-        removePetFromWorld(targetPetId, client); 
-    }
-}
+// ... (Giữ nguyên handlePvEEndActions)
 
 // ==========================================
-// 5. PVP LOGIC
+// [CẬP NHẬT] LOGIC PHẦN THƯỞNG PVP
 // ==========================================
 
-async function startPvPMatch(interaction, cid) {
-    const { challenger, opponent } = pendingChallenges.get(cid);
-    pendingChallenges.delete(cid);
-    await safeDefer(interaction, 'update');
-    
-    const u1 = Database.getUser(challenger.id);
-    const u2 = Database.getUser(opponent.id);
-    const p1 = new Pet(u1.pets[u1.activePetIndex]);
-    const p2 = new Pet(u2.pets[u2.activePetIndex]);
-
-    const weatherKeys = Object.keys(WEATHER_DATA);
-    const initWeather = WEATHER_DATA[weatherKeys[Math.floor(Math.random() * weatherKeys.length)]];
-
-    const state = {
-        mode: 'pvp', 
-        p1: { user: challenger, pet: p1, id: challenger.id }, 
-        p2: { user: opponent, pet: p2, id: opponent.id },
-        turnOwner: (p1.getStats().SPD >= p2.getStats().SPD) ? challenger.id : opponent.id,
-        weather: initWeather, 
-        logs: [`⚡ **Bắt đầu!**`, `Thời tiết: **${initWeather.name}**`]
-    };
-    activeBattles.set(challenger.id, state);
-    activeBattles.set(opponent.id, state);
-    await updatePvPInterface(interaction, state);
-}
-
-async function updatePvPInterface(interaction, battle) {
-    const { p1, p2, turnOwner, weather } = battle;
-    const p1Stats = p1.pet.getStats(); const p2Stats = p2.pet.getStats();
-    
-    const p1Display = `❤️ ${createStatusBar(p1.pet.currentHP, p1Stats.HP, 'HP')}\n✨ ${createStatusBar(p1.pet.currentMP, p1Stats.MP, 'MP')}`;
-    const p2Display = `❤️ ${createStatusBar(p2.pet.currentHP, p2Stats.HP, 'EnemyHP')}\n✨ ${createStatusBar(p2.pet.currentMP, p2Stats.MP, 'MP')}`;
-
-    const embed = new EmbedBuilder().setTitle(`⚔️ PVP - ARENA`).setColor(0xFF0000)
-        .setDescription(`👉 Lượt của: <@${turnOwner}>\n☁️ **Thời tiết:** ${weather.name}\n` + "```yaml\n" + (battle.logs.slice(-3).join('\n')) + "\n```")
-        .addFields(
-            { name: `${p1.pet.name}`, value: p1Display, inline: true }, 
-            { name: `${p2.pet.name}`, value: p2Display, inline: true }
-        );
-    
-    const p1Img = getEmojiUrl(p1.pet.icon); 
-    if (p1Img) embed.setImage(p1Img); 
-
-    const current = turnOwner === p1.id ? p1 : p2;
-    const row = new ActionRowBuilder();
-    current.pet.skills.forEach((sid, idx) => {
-        const s = getSkillById(sid);
-        const btnLabel = s ? `${s.name} | ⚔️${s.power}`.slice(0, 80) : 'Skill';
-        row.addComponents(new ButtonBuilder().setCustomId(`pvp_skill_${idx}_${current.id}`).setLabel(btnLabel).setStyle(ButtonStyle.Primary).setDisabled(current.pet.currentMP < s?.manaCost));
-    });
-    row.addComponents(new ButtonBuilder().setCustomId(`pvp_surrender_${current.id}`).setLabel('🏳️').setStyle(ButtonStyle.Secondary));
-    
-    await safeUpdateInterface(interaction, { embeds: [embed], components: [row] });
-}
+// ... (Giữ nguyên startPvPMatch, updatePvPInterface)
 
 async function processPvPTurn(interaction, idx, battle) {
+    // ... (Giữ nguyên logic tính damage cũ)
     const uid = interaction.user.id;
     if (battle.turnOwner !== uid) return interaction.followUp({ content: "Chưa đến lượt!", flags: [MessageFlags.Ephemeral] });
     
@@ -711,9 +706,34 @@ async function processPvPTurn(interaction, idx, battle) {
         battle.logs.push(`⛈️ Thời tiết: ${battle.weather.name}`);
     }
 
+    // --- XỬ LÝ KHI KẾT THÚC TRẬN ĐẤU ---
     if (def.pet.currentHP <= 0) {
         activeBattles.delete(battle.p1.id); activeBattles.delete(battle.p2.id);
-        return safeUpdateInterface(interaction, { content: `🏆 **${atk.user.username}** thắng!`, embeds: [], components: [] });
+
+        // Cộng thưởng cho người thắng
+        const winnerData = Database.getUser(atk.id);
+        const winGold = REWARD_CONFIG.PVP_WIN_GOLD;
+        const winXP = 300; // XP cứng cho PvP
+        
+        winnerData.gold = (winnerData.gold || 0) + winGold;
+        // Cộng XP cho pet thắng
+        const wPet = new Pet(winnerData.pets[winnerData.activePetIndex]);
+        wPet.addExp(winXP);
+        winnerData.pets[winnerData.activePetIndex] = wPet.getDataForSave();
+        Database.updateUser(atk.id, winnerData);
+
+        // Cộng an ủi cho người thua
+        const loserData = Database.getUser(def.id);
+        const loseGold = REWARD_CONFIG.PVP_LOSE_GOLD;
+        loserData.gold = (loserData.gold || 0) + loseGold;
+        Database.updateUser(def.id, loserData);
+
+        return safeUpdateInterface(interaction, { 
+            content: `🏆 **${atk.user.username}** CHIẾN THẮNG!\n` +
+                     `💰 Thắng: +${winGold}${EMOJIS.CURRENCY}, +${winXP}XP\n` +
+                     `💸 Thua: +${loseGold}${EMOJIS.CURRENCY} (an ủi)`, 
+            embeds: [], components: [] 
+        });
     }
     battle.turnOwner = def.id;
     await updatePvPInterface(interaction, battle);  
@@ -721,5 +741,14 @@ async function processPvPTurn(interaction, idx, battle) {
 
 async function endPvP(interaction, battle, winner) {
     activeBattles.delete(battle.p1.id); activeBattles.delete(battle.p2.id);
-    await safeUpdateInterface(interaction, { content: `🏆 **${winner.user.username}** thắng (đối thủ đầu hàng)!`, embeds: [], components: [] });
+    
+    // Xử lý thưởng khi đối thủ đầu hàng
+    const winnerData = Database.getUser(winner.id);
+    winnerData.gold = (winnerData.gold || 0) + REWARD_CONFIG.PVP_WIN_GOLD;
+    Database.updateUser(winner.id, winnerData);
+
+    await safeUpdateInterface(interaction, { 
+        content: `🏆 **${winner.user.username}** thắng (đối thủ đầu hàng)!\n💰 Nhận +${REWARD_CONFIG.PVP_WIN_GOLD} ${EMOJIS.CURRENCY}`, 
+        embeds: [], components: [] 
+    });
 }

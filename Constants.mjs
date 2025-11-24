@@ -2,6 +2,7 @@
 import { ButtonStyle } from 'discord.js';
 // === 1. EMOJIS & COLORS ===
 export const EMOJIS = {
+    CURRENCY: '<:monney:1442184713719644285>',
     PET_ICONS: [
         '<a:Rayquaza:1441631570506285166>', '<a:kiuri:1441632663126540459>', '<:HuTao:1440702400611618890>',
         '<a:source:1440702357523660820>', '<a:pikachu:1440702320290824364>', '<:Furina:1440702288032436460>',
@@ -35,6 +36,23 @@ export const POKEBALLS = {
     'ultra':  { name: 'Ultra Ball', multiplier: 2.0, icon: EMOJIS.BALL_ULTRA, style: ButtonStyle.Primary },
     'dusk':   { name: 'Dusk Ball', multiplier: 2.5, icon: EMOJIS.BALL_DUSK, style: ButtonStyle.Secondary, special: { element: 'Dark' } },
     'master': { name: 'Master Ball', multiplier: 999.0, icon: EMOJIS.BALL_MASTER, style: ButtonStyle.Danger }
+};
+export const REWARD_CONFIG = {
+    BASE_GOLD: 50, // Tiền cơ bản mỗi trận thắng
+    GOLD_PER_LEVEL: 5, // Tiền cộng thêm mỗi level của quái
+    PVP_WIN_GOLD: 200, // Tiền thắng PvP
+    PVP_LOSE_GOLD: 20, // Tiền thua PvP (an ủi)
+    
+    // Tỷ lệ drop vật phẩm dựa trên độ hiếm của quái bị đánh bại
+    DROP_RATES: {
+        'Common':    { candy_norm: 0.30, candy_high: 0.00, box_com: 0.05, box_my: 0.00, skill_1: 0.01 },
+        'Uncommon':  { candy_norm: 0.50, candy_high: 0.05, box_com: 0.10, box_my: 0.00, skill_1: 0.03 },
+        'Rare':      { candy_norm: 0.60, candy_high: 0.15, box_com: 0.20, box_my: 0.00, skill_1: 0.05 },
+        'Epic':      { candy_norm: 0.00, candy_high: 0.40, box_com: 0.30, box_my: 0.01, skill_2: 0.05 },
+        'Legendary': { candy_norm: 0.00, candy_high: 0.60, box_com: 0.50, box_my: 0.05, skill_2: 0.15 },
+        'Mythic':    { candy_norm: 0.00, candy_high: 0.80, box_com: 0.60, box_my: 0.20, skill_legend: 0.10 },
+        'Boss':      { candy_super: 1.0, box_my: 0.50, skill_legend: 0.30 } // Boss Raid
+    }
 };
 export const RARITY_COLORS = {
     'Common': 0x808080, 'Uncommon': 0x00FF00, 'Rare': 0x0099FF,

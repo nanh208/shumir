@@ -1,4 +1,4 @@
-import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import { Database } from './Database.mjs'; 
 import { BOSS_REWARD_TIERS, BOSS_DROPS, RAID_BOSS_HOURS, RARITY, DIFFICULTY_LEVELS, PVP_EVENT_CONFIG } from './Constants.mjs'; 
 import { createBossPet, applyDifficultyMultiplier, Pet } from './GameLogic.mjs'; // Đảm bảo import Pet
@@ -105,18 +105,29 @@ export class RaidBossManager {
     }
     
     async handleSignup(interaction) {
+        // [CẬP NHẬT] Sử dụng MessageFlags.Ephemeral thay vì ephemeral: true
+        
         if (this.activePVPEvent?.status !== 'SIGNUP') {
-            return interaction.reply({ content: "🚫 Đã hết thời gian đăng ký hoặc sự kiện chưa bắt đầu.", ephemeral: true });
+            return interaction.reply({ 
+                content: "🚫 Đã hết thời gian đăng ký hoặc sự kiện chưa bắt đầu.", 
+                flags: MessageFlags.Ephemeral 
+            });
         }
         if (this.pvpSignups.has(interaction.user.id)) {
-            return interaction.reply({ content: "🚫 Bạn đã đăng ký rồi.", ephemeral: true });
+            return interaction.reply({ 
+                content: "🚫 Bạn đã đăng ký rồi.", 
+                flags: MessageFlags.Ephemeral 
+            });
         }
         
         const userData = Database.getUser(interaction.user.id);
         const petData = userData.pets[userData.activePetIndex];
         
         if (!petData) {
-            return interaction.reply({ content: "🚫 Bạn chưa có Pet Active.", ephemeral: true });
+            return interaction.reply({ 
+                content: "🚫 Bạn chưa có Pet Active.", 
+                flags: MessageFlags.Ephemeral 
+            });
         }
 
         // Lưu Pet Active của người chơi
@@ -126,7 +137,10 @@ export class RaidBossManager {
         });
         
         // Ghi nhận tương tác
-        await interaction.reply({ content: `✅ Đăng ký thành công với Pet: **${petData.name}** (Lv.${petData.level})!`, ephemeral: true });
+        await interaction.reply({ 
+            content: `✅ Đăng ký thành công với Pet: **${petData.name}** (Lv.${petData.level})!`, 
+            flags: MessageFlags.Ephemeral 
+        });
 
         // Cập nhật số lượng đăng ký trên tin nhắn
         const channel = await this.client.channels.fetch(this.activePVPEvent.channelId);

@@ -15,9 +15,9 @@ const DEFAULT_USER_DATA = {
         potions: 0, 
         crates: { common: 0, mythic: 0 },
         skillBooks: [],
-        pokeballs: { poke: 0, great: 0, ultra: 0, dusk: 0, master: 0 } // ĐÃ SỬA: Pokeballs mặc định
+        pokeballs: { poke: 0, great: 0, ultra: 0, dusk: 0, master: 0 } 
     },
-    gold: 1000,
+    gold: 1000, // Tiền mặc định
     codesRedeemed: [],
     hasClaimedStarter: false,
     activePetIndex: 0,
@@ -115,6 +115,12 @@ export class Database {
         
         // Migration 3: Đảm bảo activePetIndex tồn tại
         if (user.activePetIndex === undefined) { user.activePetIndex = 0; needsSave = true; } 
+
+        // 👇👇 [QUAN TRỌNG] Migration 4: Đảm bảo GOLD tồn tại cho người chơi cũ 👇👇
+        if (user.gold === undefined) { 
+            user.gold = 1000; 
+            needsSave = true; 
+        }
         
         if (needsSave) this.saveAllUserData(allData);
         
@@ -183,11 +189,11 @@ export class Database {
     /**
      * Thiết lập kênh đấu trường cho server
      */
-static setArenaChannel(serverId, channelId) {
-    const config = this.getServerConfig(serverId);
-    config.arenaChannelId = channelId;
-    this.updateServerConfig(serverId, config);
-}
+    static setArenaChannel(serverId, channelId) {
+        const config = this.getServerConfig(serverId);
+        config.arenaChannelId = channelId;
+        this.updateServerConfig(serverId, config);
+    }
 
     /**
      * Lấy ID kênh đấu trường hiện tại

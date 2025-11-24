@@ -96,9 +96,13 @@ export async function showInventory(interaction, page = 0) {
     
     const inv = userData.inventory;
     const pets = userData.pets || [];
-
+    const userGold = userData.gold || 0;
     // --- TẠO NỘI DUNG EMBED (ITEM LIST) ---
-    let itemDesc = `**${EMOJIS.STAR || '⭐'} VẬT PHẨM TIÊU THỤ:**\n`;
+let itemDesc = `💰 **Tài sản:** \`${userGold.toLocaleString()}\` ${EMOJIS.CURRENCY || ''}\n`;
+    itemDesc += `─────────────────\n`;
+
+    // --- ITEM LIST ---
+    itemDesc += `**${EMOJIS.STAR || '⭐'} VẬT PHẨM TIÊU THỤ:**\n`;
     
     const candyKeys = Object.keys(CANDIES);
     let hasCandy = false;

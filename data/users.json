@@ -165,12 +165,12 @@
     ],
     "inventory": {
       "candies": {
-        "normal": 10169,
+        "normal": 10171,
         "high": 9999,
         "super": 9999,
         "ultra": 9999
       },
-      "potions": 1059,
+      "potions": 1060,
       "crates": {
         "common": 99,
         "mythic": 99
