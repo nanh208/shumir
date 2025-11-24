@@ -184,7 +184,9 @@ export class SpawnSystem {
             if (!serverId) return;
             
             const serverConfig = Database.getServerConfig(serverId); 
-            const difficultyMultiplier = DIFFICULTY_LEVELS?.[serverConfig.difficulty]?.multiplier || 1; 
+            // [FIX] Lấy độ khó dưới dạng chuỗi hoặc mặc định 'bình thường'
+            const difficultyKey = serverConfig?.difficulty || 'bình thường'; 
+            const difficultyMultiplier = DIFFICULTY_LEVELS?.[difficultyKey]?.multiplier || 1; 
             const arenaChannelId = serverConfig.arenaChannelId;
 
             // --- 1. FIXED RARITY SPAWN ---
@@ -206,9 +208,9 @@ export class SpawnSystem {
             // --- 3. PVP ARENA BOSS ---
             if (SCHEDULED_PVP_HOURS.includes(currentHour) && currentMinute === SCHEDULED_PVP_MINUTE) {
                 if (!this.pvpEvent.active && !this.raidManager.activeBoss && arenaChannelId) {
-                    // [FIXED] Dùng this.raidManager thay vì globalRaidManager
                     if (this.raidManager) {
-                        await this.raidManager.startArenaBossEvent(arenaChannelId, serverId, serverConfig.difficulty);
+                        // [FIX] Truyền chuỗi difficultyKey vào hàm (thay vì để mặc định hoặc undefined)
+                        await this.raidManager.startArenaBossEvent(arenaChannelId, serverId, difficultyKey);
                     }
                 }
             }

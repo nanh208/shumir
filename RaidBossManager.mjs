@@ -1,55 +1,61 @@
-import { EmbedBuilder } from 'discord.js';
+import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { Database } from './Database.mjs'; 
 import { BOSS_REWARD_TIERS, BOSS_DROPS, RAID_BOSS_HOURS, RARITY, DIFFICULTY_LEVELS, PVP_EVENT_CONFIG } from './Constants.mjs'; 
-import { createBossPet, applyDifficultyMultiplier } from './GameLogic.mjs';
+import { createBossPet, applyDifficultyMultiplier, Pet } from './GameLogic.mjs'; // Đảm bảo import Pet
 
 export class RaidBossManager {
-    constructor(client) {
-        this.client = client;
-        this.activeBoss = null; // PVE Boss Raid
-        this.damageTracker = new Map(); // Map<UserId, TotalDamage>
+    constructor(client) {
+        this.client = client;
+        this.activeBoss = null; // PVE Boss Raid
+        this.damageTracker = new Map(); // Map<UserId, TotalDamage>
 
         // [MỚI] State quản lý sự kiện PVP Boss
         this.activePVPEvent = null; // { id, status, participants, bossPet, messageId, timer }
         this.pvpSignups = new Map(); // Map<UserId, {pet, username}>
-    }
+    }
 
     // --- PVE BOSS LOGIC (Giữ nguyên) ---
 
-    async spawnNewBoss(channelId, difficultyMultiplier) {
-        if (this.activeBoss) {
-            console.warn("Boss hiện tại vẫn đang hoạt động.");
-            return null;
-        }
-        // ... (Code PVE Boss Logic cũ) ...
+    async spawnNewBoss(channelId, difficultyMultiplier) {
+        if (this.activeBoss) {
+            console.warn("Boss hiện tại vẫn đang hoạt động.");
+            return null;
+        }
+        // ... (Code PVE Boss Logic cũ giữ nguyên) ...
         // [Chú ý]: Cần đảm bảo Database.addItemToUser tồn tại hoặc thay thế bằng logic lưu item.
-    }
+    }
 
-    trackDamage(userId, damage) {
+    trackDamage(userId, damage) {
         // ... (Code trackDamage cũ, chỉ dành cho PVE Boss) ...
-    }
+    }
 
-    async distributeRewards() {
+    async distributeRewards() {
         // ... (Code distributeRewards cũ, chỉ dành cho PVE Boss) ...
-    }
+    }
 
-    async notifyResults(results, totalDamage) {
+    async notifyResults(results, totalDamage) {
         // ... (Code notifyResults cũ) ...
-    }
+    }
 
     // --- MỚI: PVP ARENA BOSS LOGIC ---
 
-    async startArenaBossEvent(channelId, serverId, difficultyKey) {
+    async startArenaBossEvent(channelId, serverId, difficultyKey = 'bình thường') {
         if (this.activePVPEvent || this.activeBoss) {
             console.warn("Đang có sự kiện Boss đang diễn ra.");
             return;
         }
 
+        // [FIX] Đảm bảo difficultyKey là chuỗi để tránh lỗi toUpperCase
+        if (!difficultyKey || typeof difficultyKey !== 'string') {
+            difficultyKey = 'bình thường';
+        }
+
         const difficultyMultiplier = DIFFICULTY_LEVELS[difficultyKey]?.multiplier || 1.0; 
 
         // 1. Tạo Pet Boss PVP (Legendary/Mythic, Gen cao)
-        // Cần giả định createBossPet hoặc spawnWildPet có sẵn từ GameLogic
-        let bossPet = createBossPet(10); 
+        // [FIX] Truyền difficultyKey (String) thay vì số 10
+        let bossPet = createBossPet(difficultyKey); 
+        
         bossPet.name = `BOSS ARENA: ${bossPet.name}`;
         bossPet.rarity = PVP_EVENT_CONFIG.BOSS_RARITY; 
         bossPet.level = (bossPet.level || 50) + PVP_EVENT_CONFIG.LEVEL_BOOST; 
