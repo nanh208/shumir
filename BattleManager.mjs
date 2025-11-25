@@ -554,47 +554,83 @@ async function showPvEVictory(interaction, battle) {
     const { playerPet, wildPet, type, wildPetId, difficulty } = battle;
     const userId = interaction.user.id;
     
-    // 1. Tính XP
-    // Adventure khó hơn thì nhiều XP hơn
+    // --- 1. CẤU HÌNH HỆ SỐ THƯỞNG THEO RANK ---
+    const RARITY_REWARD_MULT = {
+        'Common': 1.0,
+        'Uncommon': 1.2,
+        'Rare': 1.5,
+        'Epic': 2.5,
+        'Legendary': 5.0,
+        'Mythical': 10.0,
+        'Boss': 15.0,
+        'RaidBoss': 20.0
+    };
+
+    // Lấy hệ số dựa trên Rarity của quái (Mặc định là 1.0)
+    const rankMult = RARITY_REWARD_MULT[wildPet.rarity] || 1.0;
     const diffMult = typeof difficulty === 'number' ? difficulty : 1;
-    const totalXP = Math.round((wildPet.level * PET_XP_BASE + wildPet.getStats().HP / 10) * diffMult);
+
+    // --- 2. TÍNH XP (KINH NGHIỆM) ---
+    // Công thức: (Base + HP/15) * Độ khó * Rank Bonus
+    const baseXP = (wildPet.level * PET_XP_BASE) + (wildPet.getStats().HP / 15);
+    const totalXP = Math.round(baseXP * diffMult * rankMult);
     
-    // 2. Tính Tiền (Shumir Money)
-    // Công thức: (Base + Level * 5) * Hệ số độ khó * Hệ số Rarity
-    const rarityBonus = RARITY_CONFIG[wildPet.rarity]?.statMultiplier || 1;
+    // --- 3. TÍNH VÀNG (GOLD) ---
+    // Công thức: (Base + Level * 10) * Độ khó * Rank Bonus
+    // REWARD_CONFIG lấy từ Constants.mjs (giả sử Base=50, PerLvl=10)
+    const baseGoldConfig = REWARD_CONFIG.BASE_GOLD || 50;
+    const goldPerLvl = REWARD_CONFIG.GOLD_PER_LEVEL || 10;
+    
     let goldReward = Math.round(
-        (REWARD_CONFIG.BASE_GOLD + (wildPet.level * REWARD_CONFIG.GOLD_PER_LEVEL)) 
+        (baseGoldConfig + (wildPet.level * goldPerLvl)) 
         * diffMult 
-        * rarityBonus
+        * rankMult
     );
 
+    // Bonus riêng cho Raid Boss (đã khó lại còn trâu)
+    if (type === 'raid_boss') {
+        goldReward *= 2; 
+    }
+
+    // --- CẬP NHẬT DỮ LIỆU NGƯỜI CHƠI ---
     const userData = Database.getUser(userId);
     
-    // Cập nhật XP cho Pet
+    // Cộng XP cho Pet
     const pIdx = userData.pets.findIndex(p => p.id === playerPet.id);
     let lvMsg = "";
     if(pIdx !== -1) {
         const pInstance = new Pet(userData.pets[pIdx]);
-        if (pInstance.addExp(totalXP)) lvMsg = `\n🆙 **LÊN CẤP ${pInstance.level}!**`;
+        // Hồi phục full HP/MP sau khi thắng
         pInstance.currentHP = pInstance.getStats().HP;
         pInstance.currentMP = pInstance.getStats().MP;
+        
+        if (pInstance.addExp(totalXP)) {
+            lvMsg = `\n🆙 **LÊN CẤP ${pInstance.level}!**`;
+            // Hồi phục lại lần nữa để đảm bảo chỉ số mới được áp dụng
+            pInstance.currentHP = pInstance.getStats().HP;
+            pInstance.currentMP = pInstance.getStats().MP;
+        }
         userData.pets[pIdx] = pInstance.getDataForSave();
     }
     
-    // Cập nhật Tiền
+    // Cộng Tiền
     if (!userData.gold) userData.gold = 0;
     userData.gold += goldReward;
 
-    // 3. Tính toán Drop vật phẩm (Loot)
+    // --- 4. TÍNH TOÁN DROP VẬT PHẨM (LOOT) ---
     let dropMsg = "";
     let loot = [];
 
-    // Lấy tỷ lệ drop dựa trên Rarity quái
+    // Lấy tỷ lệ drop từ Config
     const rates = REWARD_CONFIG.DROP_RATES[wildPet.rarity] || REWARD_CONFIG.DROP_RATES['Common'];
 
-    // Helper function random
+    // Helper function random drop
     const tryDrop = (rate, itemKey, itemName, emoji, min = 1, max = 1) => {
-        if (Math.random() < rate) {
+        // Tăng nhẹ tỷ lệ rơi đồ nếu quái rank cao (Rank Mult)
+        // Ví dụ: Legend (x5) sẽ tăng 20% tỷ lệ rơi gốc
+        const adjustedRate = rate * (1 + (rankMult * 0.05)); 
+        
+        if (Math.random() < adjustedRate) {
             const qty = Math.floor(Math.random() * (max - min + 1)) + min;
             loot.push({ key: itemKey, qty: qty, name: itemName, emoji: emoji });
             return true;
@@ -602,14 +638,14 @@ async function showPvEVictory(interaction, battle) {
         return false;
     };
 
-    // Logic Drop
+    // Logic Drop cụ thể
     if (type === 'wild' || type === 'adventure') {
-        // Kẹo
+        // Kẹo Exp
         if (tryDrop(rates.candy_norm, 'candies.normal', 'Kẹo Thường', EMOJIS.CANDY_NORMAL, 1, 3)) {}
         if (tryDrop(rates.candy_high, 'candies.high', 'Kẹo Cao Cấp', EMOJIS.CANDY_HIGH, 1, 2)) {}
         if (tryDrop(rates.candy_super, 'candies.super', 'Kẹo Siêu Cấp', EMOJIS.CANDY_SUPER, 1, 1)) {}
         
-        // Hòm
+        // Hòm báu vật
         if (tryDrop(rates.box_com, 'crates.common', 'Hộp Thường', EMOJIS.BOX_COMMON, 1, 1)) {}
         if (tryDrop(rates.box_my, 'crates.mythic', 'Rương Thần Thoại', EMOJIS.BOX_MYTHIC, 1, 1)) {}
 
@@ -618,20 +654,16 @@ async function showPvEVictory(interaction, battle) {
         if (tryDrop(rates.skill_2, 'skillbooks.T2', 'Sách Skill II', '📘', 1, 1)) {}
         if (tryDrop(rates.skill_legend, 'skillbooks.LEGEND', 'Sách Huyền Thoại', '📜', 1, 1)) {}
         
-        // Luôn rơi Potion nếu đánh quái thường
+        // Luôn rơi Potion hồi phục
         if (type === 'wild') {
             loot.push({ key: 'potions', qty: 1, name: 'Thuốc Hồi Phục', emoji: '💊' });
         }
-    } else if (type === 'raid_boss') {
-        // Logic Raid Boss dùng Drop riêng trong Constants.BOSS_DROPS nhưng cộng thêm tiền ở đây
-        goldReward *= 5; // Boss cho nhiều tiền hơn
-    }
+    } 
 
     // Lưu vật phẩm vào Inventory
     if (!userData.inventory) userData.inventory = {};
     
     loot.forEach(item => {
-        // Xử lý nested key (ví dụ: candies.normal)
         if (item.key.includes('.')) {
             const [main, sub] = item.key.split('.');
             if (!userData.inventory[main]) userData.inventory[main] = {};
@@ -645,13 +677,18 @@ async function showPvEVictory(interaction, battle) {
     Database.updateUser(userId, userData);
     activeBattles.delete(userId);
 
-    // Xây dựng Embed
+    // --- 5. XÂY DỰNG EMBED CHIẾN THẮNG ---
     const embed = new EmbedBuilder()
         .setTitle(`🏆 CHIẾN THẮNG: ${wildPet.name}`)
         .setColor(0x00FF00)
-        .setDescription(`Bạn đã đánh bại **${wildPet.name}**! Pet đã được hồi phục.`)
+        .setDescription(`Bạn đã đánh bại **${wildPet.name}**!\nPet của bạn đã được hồi phục toàn bộ.`)
         .addFields(
-            { name: '💰 Phần Thưởng', value: `+**${goldReward.toLocaleString()}** ${EMOJIS.CURRENCY}\n+**${totalXP}** XP ${lvMsg}`, inline: true }
+            { 
+                name: '💰 Phần Thưởng', 
+                value: `+**${goldReward.toLocaleString()}** ${EMOJIS.CURRENCY} (Rank Bonus x${rankMult})\n` +
+                       `+**${totalXP}** XP ${lvMsg}`, 
+                inline: true 
+            }
         );
 
     if (dropMsg) {
@@ -660,8 +697,9 @@ async function showPvEVictory(interaction, battle) {
 
     const row = new ActionRowBuilder();
     
+    // Xóa Pet khỏi map nếu là Wild Battle
     if (type === 'wild') {
-        embed.setFooter({ text: "Đã kết liễu mục tiêu." });
+        embed.setFooter({ text: `Độ hiếm: ${wildPet.rarity} | Bonus: x${rankMult}` });
         if (wildPetId) removePetFromWorld(wildPetId, interaction.client);
     }
     

@@ -159,7 +159,11 @@ export const PET_TEMPLATES = [
     { name: "Spirit", race: "Elf", baseHP: 900, baseMP: 800, baseATK: 1000, baseSATK: 1300, baseDEF: 950, baseSPD: 110 },
     { name: "Golem", race: "Dwarf", baseHP: 1800, baseMP: 300, baseATK: 900, baseSATK: 900, baseDEF: 1500, baseSPD: 50 },
     { name: "Wisp", race: "Elemental", baseHP: 800, baseMP: 700, baseATK: 1200, baseSATK: 1300, baseDEF: 850, baseSPD: 130 },
-    { name: "Shadow", race: "Unknown", baseHP: 1000, baseMP: 500, baseATK: 1300, baseSATK: 1100, baseDEF: 1000, baseSPD: 115 }
+    { name: "Shadow", race: "Unknown", baseHP: 1000, baseMP: 500, baseATK: 1300, baseSATK: 1100, baseDEF: 1000, baseSPD: 115 },
+    // --- Cấp 2 (Dạng Tiến Hóa) ---
+    { name: "King Slime", race: "Elemental", baseHP: 3500, baseMP: 1200, baseATK: 2800, baseSATK: 2500, baseDEF: 3000, baseSPD: 110, passive: 'VAMPIRISM', icon: '👑' }, 
+    { name: "Raichu-God", race: "Beast", baseHP: 2500, baseMP: 2000, baseATK: 3200, baseSATK: 3500, baseDEF: 2800, baseSPD: 200, passive: 'CRIT_MASTER', icon: '⚡' },
+    { name: "Bahamut", race: "Dragon", baseHP: 4000, baseMP: 2500, baseATK: 4500, baseSATK: 4200, baseDEF: 3800, baseSPD: 150, passive: 'BERSEKER', icon: '🐲' }
 ];
 
 // === 6. ITEMS, CANDIES & SKILLBOOKS ===

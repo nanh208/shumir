@@ -7,7 +7,7 @@ import {
 } from 'discord.js';
 
 import { Database } from './Database.mjs';
-import { Pet } from './GameLogic.mjs'; 
+import { Pet } from './Pet.mjs'; 
 import { getSkillById } from './SkillList.mjs'; 
 import { 
     EMOJIS, 
@@ -21,62 +21,39 @@ const ITEMS_PER_PAGE = 5;
 const POINTS_PER_LEVEL = 3;
 
 // ==========================================
-// 0. HELPER FUNCTIONS (CORE FIX 40060)
+// 0. HELPER FUNCTIONS
 // ==========================================
 
-// Hàm Defer thông minh: Nếu đã defer rồi thì thôi, không báo lỗi
 async function safeDefer(interaction) {
     try {
         if (!interaction.deferred && !interaction.replied) {
             await interaction.deferUpdate();
         }
     } catch (e) {
-        // Bỏ qua lỗi 40060 (đã acknowledged) và 10062 (unknown)
         if (e.code !== 40060 && e.code !== 10062) console.error("Defer Error:", e.message);
     }
 }
 
-// Hàm phản hồi thông minh (Tự động chọn Update/Edit/Reply/FollowUp)
-// Đây là chìa khóa để sửa lỗi crash 40060
 async function safeResponse(interaction, payload, type = 'update') {
-    // Chuẩn hóa payload
     const data = typeof payload === 'string' ? { content: payload } : payload;
-    
-    // Nếu là tin nhắn tạm thời (ephemeral), dùng followUp
     if (data.flags && data.flags.includes(MessageFlags.Ephemeral)) {
-        try {
-            return await interaction.followUp(data);
-        } catch (e) { return; } // Bỏ qua nếu lỗi
+        try { return await interaction.followUp(data); } catch (e) { return; }
     }
-
     try {
-        // Ưu tiên 1: Nếu đã Defer/Reply -> Dùng editReply
         if (interaction.deferred || interaction.replied) {
             return await interaction.editReply(data);
         }
-        
-        // Ưu tiên 2: Nếu chưa làm gì -> Dùng update (cho nút) hoặc reply (cho lệnh)
-        if (type === 'update') {
-            return await interaction.update(data);
-        } else {
-            return await interaction.reply(data);
-        }
+        if (type === 'update') return await interaction.update(data);
+        else return await interaction.reply(data);
     } catch (error) {
-        // CỨU LỖI 40060: Nếu API báo "Đã acknowledged" mà biến cục bộ chưa cập nhật
-        // -> Ép dùng editReply
         if (error.code === 40060 || error.code === 'InteractionAlreadyReplied') {
-            try {
-                return await interaction.editReply(data);
-            } catch (err2) {}
-        }
-        // Bỏ qua lỗi Unknown Interaction (hết hạn)
-        else if (error.code !== 10062) {
+            try { return await interaction.editReply(data); } catch (err2) {}
+        } else if (error.code !== 10062) {
             console.error("SafeResponse Error:", error.message);
         }
     }
 }
 
-// Hàm thông báo nhanh (Thay thế alert)
 async function safeAlert(interaction, message) {
     await safeResponse(interaction, { content: message, flags: [MessageFlags.Ephemeral] }, 'reply');
 }
@@ -90,18 +67,36 @@ export async function showInventory(interaction, page = 0) {
     const userData = Database.getUser(userId);
     page = parseInt(page) || 0;
     
+    // --- KHỞI TẠO DỮ LIỆU AN TOÀN ---
     if (userData.activePetIndex === undefined) userData.activePetIndex = 0;
-    if (!userData.inventory) userData.inventory = { candies: {}, skillbooks: {}, crates: {}, potions: 0 };
-    if (!userData.inventory.pokeballs) userData.inventory.pokeballs = {}; 
     
+    // Đảm bảo cấu trúc inventory đầy đủ (bao gồm items và skillBooks)
+    if (!userData.inventory) {
+        userData.inventory = { 
+            candies: {}, 
+            skillBooks: [], 
+            crates: {}, 
+            potions: 0, 
+            pokeballs: {},
+            items: {} 
+        };
+    }
+    
+    // Migration nhẹ: Nếu user cũ chưa có các trường này thì thêm vào
     const inv = userData.inventory;
+    if (!inv.skillBooks) inv.skillBooks = [];
+    if (!inv.items) inv.items = {};
+    if (!inv.candies) inv.candies = {};
+    if (!inv.pokeballs) inv.pokeballs = {};
+
     const pets = userData.pets || [];
     const userGold = userData.gold || 0;
+
     // --- TẠO NỘI DUNG EMBED (ITEM LIST) ---
-let itemDesc = `💰 **Tài sản:** \`${userGold.toLocaleString()}\` ${EMOJIS.CURRENCY || ''}\n`;
+    let itemDesc = `💰 **Tài sản:** \`${userGold.toLocaleString()}\` ${EMOJIS.CURRENCY || 'Gold'}\n`;
     itemDesc += `─────────────────\n`;
 
-    // --- ITEM LIST ---
+    // 1. KẸO & THUỐC
     itemDesc += `**${EMOJIS.STAR || '⭐'} VẬT PHẨM TIÊU THỤ:**\n`;
     
     const candyKeys = Object.keys(CANDIES);
@@ -111,10 +106,10 @@ let itemDesc = `💰 **Tài sản:** \`${userGold.toLocaleString()}\` ${EMOJIS.C
         const qty = inv.candies[key.toLowerCase()] || 0;
         if (qty > 0) { itemDesc += `${cfg.emoji} **${cfg.name}**: \`${qty}\`\n`; hasCandy = true; }
     });
-    if (!hasCandy) itemDesc += "*Không có kẹo nào.*\n";
+    if (inv.potions > 0) { itemDesc += `💊 **Thuốc Hồi Phục**: \`${inv.potions}\`\n`; hasCandy = true; }
+    if (!hasCandy) itemDesc += "_Trống_\n";
     
-    itemDesc += `\n**${EMOJIS.BOX_COMMON || '📦'} VẬT PHẨM KHÁC:**\n💊 Thuốc Hồi Phục: \`${inv.potions || 0}\`\n`;
-    
+    // 2. BÓNG BẮT PET
     itemDesc += `\n**${EMOJIS.BALL_MASTER || '🏐'} BÓNG THU PHỤC:**\n`;
     let hasBalls = false;
     for (const key in POKEBALLS) {
@@ -122,7 +117,38 @@ let itemDesc = `💰 **Tài sản:** \`${userGold.toLocaleString()}\` ${EMOJIS.C
         const qty = inv.pokeballs?.[key] || 0; 
         if (qty > 0) { itemDesc += `${ball.icon} **${ball.name}**: \`${qty}\`\n`; hasBalls = true; }
     }
-    if (!hasBalls) itemDesc += "*Không có bóng nào.*\n";
+    if (!hasBalls) itemDesc += "_Trống_\n";
+
+    // 3. [MỚI] SÁCH KỸ NĂNG (Gom nhóm hiển thị)
+    if (inv.skillBooks && inv.skillBooks.length > 0) {
+        itemDesc += `\n**📜 SÁCH KỸ NĂNG:**\n`;
+        // Logic gom nhóm: Đếm số lượng sách cùng hệ và cùng phẩm chất
+        const bookCounts = {};
+        inv.skillBooks.forEach(book => {
+            // Ví dụ key: "Fire [Rare]"
+            const key = `${book.element} [${book.quality}]`;
+            bookCounts[key] = (bookCounts[key] || 0) + 1;
+        });
+
+        for (const [name, count] of Object.entries(bookCounts)) {
+            itemDesc += `📘 **Sách ${name}**: \`${count}\`\n`;
+        }
+    }
+
+    // 4. [MỚI] VẬT PHẨM KHÁC (Buff, Key...)
+    if (inv.items && Object.keys(inv.items).length > 0) {
+        let hasItems = false;
+        let tempDesc = `\n**🧩 VẬT PHẨM KHÁC:**\n`;
+        for (const [itemId, qty] of Object.entries(inv.items)) {
+            if (qty > 0) {
+                // Làm đẹp tên ID (ví dụ: item_buff_atk -> Item Buff Atk)
+                const itemName = itemId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                tempDesc += `🔸 **${itemName}**: \`${qty}\`\n`;
+                hasItems = true;
+            }
+        }
+        if (hasItems) itemDesc += tempDesc;
+    }
 
     // --- TẠO NỘI DUNG EMBED (PET LIST) ---
     const totalPages = Math.ceil(pets.length / ITEMS_PER_PAGE);
@@ -143,7 +169,7 @@ let itemDesc = `💰 **Tài sản:** \`${userGold.toLocaleString()}\` ${EMOJIS.C
             const rIcon = RARITY_CONFIG[p.rarity]?.icon || '⚪';
             const eIcon = ELEMENT_ICONS[p.element] || '';
             const isActive = (userData.activePetIndex === absoluteIndex);
-            const statusIcon = isActive ? '🚩 **[Đang chọn]**' : (p.deathTime ? '💀' : '');
+            const statusIcon = isActive ? '🚩' : (p.deathTime ? '💀' : '');
             
             petListDesc += `**\`[${absoluteIndex + 1}]\`** ${rIcon} **${p.name}** (Lv.${p.level}) ${eIcon} ${statusIcon}\n`;
         });
@@ -157,7 +183,7 @@ let itemDesc = `💰 **Tài sản:** \`${userGold.toLocaleString()}\` ${EMOJIS.C
             { name: '📦 KHO VẬT PHẨM', value: itemDesc, inline: true },
             { name: `🐾 DANH SÁCH THÚ CƯNG (${pets.length}/10)`, value: petListDesc, inline: false }
         )
-        .setFooter({ text: `Trang ${page + 1}/${totalPages || 1} • (Tương tác trong tin nhắn riêng)` });
+        .setFooter({ text: `Trang ${page + 1}/${totalPages || 1} • ID: ${userId}` });
 
     // Pagination Logic
     const prevPage = Math.max(0, page - 1);
@@ -189,14 +215,14 @@ let itemDesc = `💰 **Tài sản:** \`${userGold.toLocaleString()}\` ${EMOJIS.C
 
     const payload = { content: null, embeds: [embed], components: rows };
 
-    // Xử lý gửi DM (Nếu là slash command lần đầu)
-    if (!interaction.isButton() && interaction.guild) {
+    // Xử lý gửi DM (Nếu là slash command /inventory)
+    if (!interaction.isButton() && !interaction.isStringSelectMenu() && interaction.guild) {
         try {
             if (!interaction.deferred && !interaction.replied) await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
             await interaction.user.send(payload);
             await interaction.editReply({ content: "✅ **Đã gửi túi đồ vào Tin nhắn riêng (DM)!**", embeds: [], components: [] });
         } catch (error) {
-            await safeResponse(interaction, { content: "🚫 **Không thể gửi DM.** Vui lòng mở khóa tin nhắn.", embeds: [], components: [] }, 'reply');
+            await safeResponse(interaction, { ...payload, flags: [MessageFlags.Ephemeral] }, 'editReply');
         }
         return;
     }
@@ -244,31 +270,24 @@ export async function showPetDetails(interaction, petIndex) {
     }).join('\n') || "_Chưa học kỹ năng nào_";
     embed.addFields({ name: '📜 KỸ NĂNG', value: skillTxt, inline: false });
 
-    // [LOGIC GIỮ NGUYÊN - CHỈ SỬA UI]
-    // Chia làm 3 hàng nút để thêm nút THẢ PET
-    
-    // Hàng 1: Hành động chính
     const rowActions = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(`inv_equip_${petIndex}`).setEmoji('🚩').setLabel(isActive ? 'Đang Đồng Hành' : 'Chọn Đồng Hành').setStyle(isActive ? ButtonStyle.Success : ButtonStyle.Secondary).setDisabled(isActive),
-        // ==> NÚT THẢ PET Ở ĐÂY
         new ButtonBuilder().setCustomId(`inv_release_confirm_${petIndex}`).setEmoji('🗑️').setLabel('Thả Pet').setStyle(ButtonStyle.Danger)
     );
     
-    // Hàng 2: Chức năng Pet
     const rowUpgrade = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(`inv_menu_feed_${petIndex}`).setEmoji(EMOJIS.CANDY_NORMAL || '🍬').setLabel('Cho Ăn').setStyle(ButtonStyle.Primary),
         new ButtonBuilder().setCustomId(`inv_menu_stats_${petIndex}`).setEmoji('💪').setLabel('Nâng Cấp').setStyle(ButtonStyle.Primary),
         new ButtonBuilder().setCustomId(`inv_menu_learn_${petIndex}`).setEmoji('📚').setLabel('Học Skill').setStyle(ButtonStyle.Secondary)
     );
 
-    // Hàng 3: Điều hướng
     const rowBack = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('inv_to_main_0').setLabel('🎒 Quay lại').setStyle(ButtonStyle.Secondary));
 
     await safeResponse(interaction, { content: null, embeds: [embed], components: [rowActions, rowUpgrade, rowBack] }, 'update');
 }
 
 // ==========================================
-// 3. CÁC MENU PHỤ (LOGIC GIỮ NGUYÊN)
+// 3. CÁC MENU PHỤ
 // ==========================================
 
 export async function showFeedMenu(interaction, petIndex) {
@@ -421,7 +440,6 @@ export async function handleInventoryInteraction(interaction) {
         const index = parseInt(customId.split('_').pop());
         await handleEquipPet(interaction, index);
     }
-    // Router cho nút THẢ PET
     else if (customId.startsWith('inv_release_confirm_')) {
         const index = parseInt(customId.split('_').pop());
         await handleReleasePet(interaction, index);

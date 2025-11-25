@@ -1,3 +1,4 @@
+// Database.mjs
 import fs from 'fs';
 import path from 'path';
 
@@ -14,8 +15,9 @@ const DEFAULT_USER_DATA = {
         candies: { normal: 0, high: 0, super: 0, ultra: 0 }, 
         potions: 0, 
         crates: { common: 0, mythic: 0 },
-        skillBooks: [],
-        pokeballs: { poke: 0, great: 0, ultra: 0, dusk: 0, master: 0 } 
+        skillBooks: [], // Mảng chứa sách kỹ năng
+        pokeballs: { poke: 0, great: 0, ultra: 0, dusk: 0, master: 0 },
+        items: {} // [MỚI] Chứa các item hỗ trợ khác (Buff, Ticket, v.v.)
     },
     gold: 1000, // Tiền mặc định
     codesRedeemed: [],
@@ -116,10 +118,16 @@ export class Database {
         // Migration 3: Đảm bảo activePetIndex tồn tại
         if (user.activePetIndex === undefined) { user.activePetIndex = 0; needsSave = true; } 
 
-        // 👇👇 [QUAN TRỌNG] Migration 4: Đảm bảo GOLD tồn tại cho người chơi cũ 👇👇
+        // Migration 4: Đảm bảo GOLD tồn tại cho người chơi cũ
         if (user.gold === undefined) { 
             user.gold = 1000; 
             needsSave = true; 
+        }
+
+        // Migration 5: Đảm bảo trường Items (cho Buff/Vật phẩm phụ) tồn tại
+        if (!user.inventory.items) {
+            user.inventory.items = {};
+            needsSave = true;
         }
         
         if (needsSave) this.saveAllUserData(allData);
@@ -139,6 +147,62 @@ export class Database {
             ? petData.getDataForSave() 
             : petData;
         user.pets.push(petToSave);
+        this.updateUser(userId, user);
+    }
+
+    // --- [MỚI] HỆ THỐNG THÊM VẬT PHẨM (Dùng cho Adventure/Shop) ---
+    /**
+     * Thêm vật phẩm vào túi đồ người chơi
+     * @param {string} userId - ID người chơi
+     * @param {string} itemId - ID vật phẩm (vd: 'ball_common', 'candy_exp', 'book_fire_rare')
+     * @param {number} quantity - Số lượng
+     * @param {object} metadata - Dữ liệu phụ (cho sách skill, item đặc biệt)
+     */
+    static addItem(userId, itemId, quantity, metadata = {}) {
+        const user = this.getUser(userId);
+        const inv = user.inventory;
+
+        // 1. XỬ LÝ BÓNG (Pokeballs)
+        // Mapping ID từ Adventure sang key trong Inventory
+        if (itemId.startsWith('ball_')) {
+            let ballType = 'poke'; // Mặc định
+            if (itemId === 'ball_common') ballType = 'poke';
+            if (itemId === 'ball_great') ballType = 'great'; // Dự phòng
+            if (itemId === 'ball_legendary') ballType = 'master'; // Bóng Legend = Master Ball
+
+            if (inv.pokeballs[ballType] !== undefined) {
+                inv.pokeballs[ballType] += quantity;
+            }
+        }
+
+        // 2. XỬ LÝ KẸO (Candies)
+        else if (itemId.startsWith('candy_')) {
+            if (itemId === 'candy_exp') inv.candies.normal += quantity;
+            else if (itemId === 'candy_premium') inv.candies.high += quantity;
+            else if (itemId === 'candy_super') inv.candies.super += quantity;
+        }
+
+        // 3. XỬ LÝ SÁCH KỸ NĂNG (Skill Books)
+        else if (itemId.startsWith('book_')) {
+            // Sách không cộng dồn số lượng đơn giản, mà thêm vào danh sách
+            // Metadata sẽ chứa thông tin hệ (element) và phẩm chất (quality)
+            for (let i = 0; i < quantity; i++) {
+                inv.skillBooks.push({
+                    id: itemId,
+                    element: metadata.element || 'Normal',
+                    quality: metadata.quality || 'Common',
+                    obtainedAt: Date.now()
+                });
+            }
+        }
+
+        // 4. CÁC ITEM KHÁC (Buff, Key, v.v.)
+        else {
+            if (!inv.items) inv.items = {};
+            if (!inv.items[itemId]) inv.items[itemId] = 0;
+            inv.items[itemId] += quantity;
+        }
+
         this.updateUser(userId, user);
     }
 
