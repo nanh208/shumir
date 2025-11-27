@@ -161,11 +161,42 @@
         ],
         "activeEffects": [],
         "passive": "THORNS"
+      },
+      {
+        "id": "mihk9m2ln610gvrxti",
+        "name": "Raichu-God",
+        "nickname": "Raichu-God",
+        "icon": "<:HuTao:1440702400611618890>",
+        "element": "Physical",
+        "race": "Beast",
+        "rarity": "Mythic",
+        "baseStats": {
+          "HP": 7500,
+          "MP": 2000,
+          "ATK": 9600,
+          "SATK": 10500,
+          "DEF": 8400,
+          "SPD": 200
+        },
+        "level": 7,
+        "xp": 0,
+        "gen": 99.37865395307267,
+        "statPoints": 0,
+        "currentHP": 28855,
+        "currentMP": 7779,
+        "skills": [
+          "S1",
+          "lig_heal_1",
+          "fir_debuff_2",
+          "phy_08"
+        ],
+        "activeEffects": [],
+        "passive": "CRIT_MASTER"
       }
     ],
     "inventory": {
       "candies": {
-        "normal": 10175,
+        "normal": 10178,
         "high": 10001,
         "super": 9999,
         "ultra": 9999
@@ -188,7 +219,7 @@
         "great": 999,
         "ultra": 998,
         "dusk": 999,
-        "master": 984
+        "master": 983
       },
       "items": {}
     },

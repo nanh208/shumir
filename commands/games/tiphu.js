@@ -1,7 +1,7 @@
 // commands/games/tiphu.js
 
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { createNewGame, endGame, buildGameInterface, activeMonopolyGames } = require('../../utils/monopolyLogic'); // Thay đổi đường dẫn
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
+const { createNewGame, endGame, buildGameInterface, activeMonopolyGames } = require('../../utils/monopolyLogic');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -12,7 +12,7 @@ module.exports = {
                 .setName('start')
                 .setDescription('Bắt đầu một game Cờ Tỷ Phú mới.')
                 .addIntegerOption(option => 
-                    option.setName('nguoichoi') // Đổi tên option sang tiếng Việt
+                    option.setName('nguoichoi')
                         .setDescription('Số lượng người chơi (2-4).')
                         .setRequired(true)
                         .setMinValue(2)
@@ -31,8 +31,8 @@ module.exports = {
         if (subcommand === 'start') {
             const numPlayers = interaction.options.getInteger('nguoichoi');
 
-            // Defer an ephemeral acknowledgement so the command doesn't time out
-            await interaction.deferReply({ ephemeral: true }).catch(()=>{});
+            // [FIX] Sử dụng MessageFlags thay cho ephemeral: true để tránh warning
+            await interaction.deferReply({ flags: [MessageFlags.Ephemeral] }).catch(()=>{});
 
             const joinButton = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
@@ -41,11 +41,9 @@ module.exports = {
                     .setStyle(ButtonStyle.Success)
             );
 
-            // Send a public registration message in the channel and use it for collecting
             const registrationMessage = await interaction.channel.send({ content: `Đã bắt đầu đăng ký! Cần **${numPlayers}** người chơi để bắt đầu Cờ Tỷ Phú. Click nút **Tham gia** để đăng ký.`, components: [joinButton] });
 
-            // Acknowledge to the command user
-            await interaction.editReply({ content: `✅ Đã mở đăng ký trong kênh <#${interaction.channel.id}>`, ephemeral: true }).catch(()=>{});
+            await interaction.editReply({ content: `✅ Đã mở đăng ký trong kênh <#${interaction.channel.id}>` }).catch(()=>{});
 
             const collectedPlayers = new Set();
             collectedPlayers.add(interaction.user.id);
@@ -56,14 +54,16 @@ module.exports = {
             collector.on('collect', async i => {
                 try {
                     if (collectedPlayers.has(i.user.id)) {
-                        return i.reply({ content: 'Bạn đã tham gia rồi!', ephemeral: true }).catch(()=>{});
+                        // [FIX] Sử dụng MessageFlags
+                        return i.reply({ content: 'Bạn đã tham gia rồi!', flags: [MessageFlags.Ephemeral] }).catch(()=>{});
                     }
                     collectedPlayers.add(i.user.id);
 
                     if (collectedPlayers.size === numPlayers) {
                         collector.stop();
                     } else {
-                        await i.reply({ content: `Bạn đã tham gia! Cần thêm ${numPlayers - collectedPlayers.size} người nữa.`, ephemeral: true }).catch(()=>{});
+                        // [FIX] Sử dụng MessageFlags
+                        await i.reply({ content: `Bạn đã tham gia! Cần thêm ${numPlayers - collectedPlayers.size} người nữa.`, flags: [MessageFlags.Ephemeral] }).catch(()=>{});
                     }
                 } catch (err) {
                     console.error('Error in collector.collect:', err);
@@ -77,7 +77,6 @@ module.exports = {
                         return;
                     }
 
-                    // Build player objects with id and username (fetch members)
                     const playerIds = Array.from(collectedPlayers.values());
                     const playerArray = [];
                     for (const id of playerIds) {
@@ -111,9 +110,11 @@ module.exports = {
         } else if (subcommand === 'end') {
             if (activeMonopolyGames.has(interaction.channelId)) {
                 endGame(interaction.channelId);
-                await interaction.reply({ content: '✅ Game Cờ Tỷ Phú đã kết thúc.', ephemeral: true });
+                // [FIX] Sử dụng MessageFlags
+                await interaction.reply({ content: '✅ Game Cờ Tỷ Phú đã kết thúc.', flags: [MessageFlags.Ephemeral] });
             } else {
-                await interaction.reply({ content: '❌ Không có game nào đang hoạt động trong kênh này.', ephemeral: true });
+                // [FIX] Sử dụng MessageFlags
+                await interaction.reply({ content: '❌ Không có game nào đang hoạt động trong kênh này.', flags: [MessageFlags.Ephemeral] });
             }
         }
     },

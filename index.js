@@ -2,6 +2,8 @@
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
+// Thêm pathToFileURL để hỗ trợ import file .mjs trên mọi hệ điều hành
+const { pathToFileURL } = require("url"); 
 const {
     Client,
     Collection,
@@ -25,7 +27,24 @@ const client = new Client({
 // --- Nối Từ (Lưu trữ trạng thái game) ---
 const wordGameStates = new Map(); 
 const configPath = path.resolve(__dirname, './data/game-config.json');
+// ... (code cũ của Nối Từ) ...
 
+// --- [THÊM ĐOẠN NÀY VÀO] ---
+// Cấu hình Game Đế Chế (Load file empire-config.json)
+let empireConfig = {}; 
+const empireConfigPath = path.resolve(__dirname, './data/empire-config.json');
+try {
+    if (fs.existsSync(empireConfigPath)) {
+        empireConfig = JSON.parse(fs.readFileSync(empireConfigPath, 'utf8'));
+        console.log("✅ Đã tải cấu hình Empire Game.");
+    } else {
+        // Tạo thư mục/file nếu chưa có để tránh lỗi
+        const dir = path.dirname(empireConfigPath);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(empireConfigPath, JSON.stringify({}, null, 2));
+    }
+} catch (e) { console.error("❌ Lỗi load config Empire:", e); }
+// ----------------------------
 // --- Ma Sói & Cờ Tỷ Phú (Logic cũ) ---
 let activeWerewolfGames = new Map();
 try {
@@ -110,30 +129,57 @@ try {
 client.commands = new Collection();
 const commandsPath = path.join(__dirname, "commands");
 
-const loadCommands = (directoryPath) => {
+// [UPDATED] Hàm loadCommands chuyển sang Async để hỗ trợ dynamic import (.mjs)
+const loadCommands = async (directoryPath) => {
     if (!fs.existsSync(directoryPath)) return;
-    fs.readdirSync(directoryPath)
-        .filter(f => f.endsWith(".js"))
-        .forEach(file => {
-            try {
-                const cmd = require(path.join(directoryPath, file));
-                
-                if (['pet_list', 'pet_info'].includes(cmd.data?.name)) return; 
+    
+    // Lọc cả file .js và .mjs
+    const files = fs.readdirSync(directoryPath)
+        .filter(f => f.endsWith(".js") || f.endsWith(".mjs"));
 
-                if (cmd.data && cmd.execute) {
-                    client.commands.set(cmd.data.name, cmd);
-                }
-            } catch (error) {
-                console.error(`❌ Lỗi khi tải lệnh ${file}:`, error);
+    // Dùng vòng lặp for...of để có thể await bên trong
+    for (const file of files) {
+        try {
+            const filePath = path.join(directoryPath, file);
+            let cmd;
+
+            // Kiểm tra đuôi file để chọn cách load
+            if (file.endsWith(".mjs")) {
+                // Dùng dynamic import cho .mjs (convert path sang URL để tránh lỗi trên Windows)
+                const module = await import(pathToFileURL(filePath).href);
+                cmd = module.default || module;
+            } else {
+                // Dùng require cho .js như cũ
+                cmd = require(filePath);
             }
-        });
+            
+            // Bỏ qua các lệnh cũ nếu cần
+            if (['pet_list', 'pet_info'].includes(cmd.data?.name)) continue; 
+
+            if (cmd.data && cmd.execute) {
+                client.commands.set(cmd.data.name, cmd);
+            } else {
+                console.warn(`⚠️ [WARNING] Lệnh ${file} thiếu "data" hoặc "execute".`);
+            }
+        } catch (error) {
+            console.error(`❌ Lỗi khi tải lệnh ${file}:`, error);
+        }
+    }
 };
 
+// [UPDATED] Thực thi loadCommands (cần bọc trong IIFE async vì loadCommands giờ là async)
 if (fs.existsSync(commandsPath)) {
-    loadCommands(commandsPath);
-    const subDirs = fs.readdirSync(commandsPath).filter(name => fs.statSync(path.join(commandsPath, name)).isDirectory());
-    subDirs.forEach(folder => loadCommands(path.join(commandsPath, folder)));
-    console.log(`✅ Đã tải ${client.commands.size} slash commands.`);
+    (async () => {
+        await loadCommands(commandsPath);
+        
+        // Load thư mục con
+        const subDirs = fs.readdirSync(commandsPath).filter(name => fs.statSync(path.join(commandsPath, name)).isDirectory());
+        for (const folder of subDirs) {
+            await loadCommands(path.join(commandsPath, folder));
+        }
+        
+        console.log(`✅ Đã tải ${client.commands.size} slash commands (.js & .mjs).`);
+    })();
 } else {
     console.warn("⚠️ Thư mục commands không tồn tại.");
 }
@@ -192,7 +238,36 @@ client.on("interactionCreate", async (interaction) => {
 
         // --- SLASH COMMAND ---
         if (interaction.isChatInputCommand()) {
-            
+            const empireCommands = ['register', 'build', 'recruit', 'me', 'map', 'attack', 'scout', 'move', 'market'];
+            if (empireCommands.includes(commandName)) {
+                // Lấy ID kênh đã setup cho server này
+                const allowedChannelId = empireConfig[interaction.guildId];
+                
+                // Nếu chưa setup
+                if (!allowedChannelId) {
+                    return interaction.reply({ 
+                        content: "⚠️ Server này chưa thiết lập kênh chơi game!\nVui lòng nhờ Admin dùng lệnh `/setup_empire` tại kênh muốn chơi.", 
+                        ephemeral: true // Chỉ người dùng thấy
+                    });
+                }
+
+                // Nếu sai kênh
+                if (interaction.channelId !== allowedChannelId) {
+                    return interaction.reply({ 
+                        content: `⛔ **Sai địa bàn!**\nVui lòng di chuyển sang kênh <#${allowedChannelId}> để điều hành vương quốc.`, 
+                        ephemeral: true 
+                    });
+                }
+            }
+
+            // 2. Logic Game Đế Chế: Xử lý lệnh setup
+            if (commandName === 'setup_empire') {
+                const cmd = client.commands.get('setup_empire');
+                if (cmd) {
+                    // Truyền biến empireConfig vào để lệnh cập nhật và lưu file
+                    return cmd.execute(interaction, client, null, null, null, empireConfig);
+                }
+            }
             // [FIX 1: IMMEDIATE DEFERRAL for ALL Slash Commands]
             await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
@@ -269,8 +344,7 @@ client.on("interactionCreate", async (interaction) => {
             // 3. Định tuyến commands game khác
             const command = client.commands.get(commandName);
             if (!command) return;
-            return command.execute(interaction, client, wordGameStates, activeWerewolfGames, activeMonopolyGames);
-        }
+return command.execute(interaction, client, wordGameStates, activeWerewolfGames, activeMonopolyGames, empireConfig);        }
 
         // --- BUTTON & SELECT MENU ---
         // ... (Giữ nguyên logic xử lý Buttons) ...
