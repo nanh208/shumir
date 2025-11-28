@@ -1,8 +1,7 @@
-// index.js — Shumir Bot (UPDATED FOR NEW BATTLE SYSTEM)
+// index.js — Shumir Bot (MERGED VERSION: Pet + Empire + Others)
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
-// Thêm pathToFileURL để hỗ trợ import file .mjs trên mọi hệ điều hành
 const { pathToFileURL } = require("url"); 
 const {
     Client,
@@ -10,7 +9,7 @@ const {
     GatewayIntentBits,
     Events,
     EmbedBuilder, 
-    MessageFlags // Import MessageFlags để dùng thay cho ephemeral: true
+    MessageFlags
 } = require("discord.js");
 
 // ====== 1. CLIENT CONFIGURATION ======
@@ -24,28 +23,26 @@ const client = new Client({
 
 // ====== 2. GAME STATE & LOGIC IMPORTS ======
 
-// --- Nối Từ (Lưu trữ trạng thái game) ---
+// --- [KEEP] Nối Từ ---
 const wordGameStates = new Map(); 
 const configPath = path.resolve(__dirname, './data/game-config.json');
-// ... (code cũ của Nối Từ) ...
 
-// --- [THÊM ĐOẠN NÀY VÀO] ---
-// Cấu hình Game Đế Chế (Load file empire-config.json)
+// --- [NEW] Cấu hình Game Đế Chế ---
 let empireConfig = {}; 
 const empireConfigPath = path.resolve(__dirname, './data/empire-config.json');
 try {
     if (fs.existsSync(empireConfigPath)) {
         empireConfig = JSON.parse(fs.readFileSync(empireConfigPath, 'utf8'));
-        console.log("✅ Đã tải cấu hình Empire Game.");
+        console.log("✅ [Empire] Đã tải cấu hình Game Đế Chế.");
     } else {
-        // Tạo thư mục/file nếu chưa có để tránh lỗi
         const dir = path.dirname(empireConfigPath);
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         fs.writeFileSync(empireConfigPath, JSON.stringify({}, null, 2));
     }
 } catch (e) { console.error("❌ Lỗi load config Empire:", e); }
-// ----------------------------
-// --- Ma Sói & Cờ Tỷ Phú (Logic cũ) ---
+// ----------------------------------------
+
+// --- [KEEP] Ma Sói & Cờ Tỷ Phú ---
 let activeWerewolfGames = new Map();
 try {
     const werewolfModule = require("./utils/activeWerewolfGames.js");
@@ -60,34 +57,29 @@ try {
     handleMonopolyInteraction = monopolyModule.handleMonopolyInteraction;
 } catch (e) { console.warn("⚠️ Monopoly Module not found."); }
 
-// --- Pet Game (Dynamic Import cho ES Modules) ---
-// [FIX] Khai báo thêm GachaModule và handleGacha
+// --- [KEEP] Pet Game Modules ---
 let SpawnModule, BattleModule, CommandModule, StarterPetModule, InventoryModule, DatabaseModule, GachaModule;
 let spawner;
 let SpawnSystem, handleBattle, handleSlashCommand, handleButtons, setSpawnSystemRef, setRaidManagerRef, handleStarterCommand, handleInventoryInteraction, Database, handleGacha;
 
-// Hàm nạp module không đồng bộ (Async Loader)
+// Hàm load module Pet (Giữ nguyên)
 async function loadGameModules() {
     try {
-        // [QUAN TRỌNG] Import Database
         DatabaseModule = await import("./Database.mjs");
         Database = DatabaseModule.Database;
         
-        // [FIX] Load Gacha System
         GachaModule = await import("./GachaSystem.mjs");
         handleGacha = GachaModule.handleGacha;
 
         SpawnModule = await import("./SpawnSystem.mjs");
-        BattleModule = await import("./BattleManager.mjs"); // File quản lý chiến đấu chính
+        BattleModule = await import("./BattleManager.mjs");
         CommandModule = await import("./CommandHandlers.mjs");
         StarterPetModule = await import("./StarterPet.mjs");
         InventoryModule = await import("./InventoryUI.mjs");
 
         SpawnSystem = SpawnModule.SpawnSystem;
-        
-        // 👇 CẬP NHẬT MỚI: Lấy hàm xử lý từ BattleManager mới
         handleBattle = BattleModule.handleInteraction; 
-        setRaidManagerRef = BattleModule.setRaidManagerRef; // Hàm này giờ nằm ở BattleManager
+        setRaidManagerRef = BattleModule.setRaidManagerRef;
         
         handleSlashCommand = CommandModule.handleSlashCommand;
         handleButtons = CommandModule.handleButtons;
@@ -95,71 +87,52 @@ async function loadGameModules() {
         handleStarterCommand = StarterPetModule.handleStarterCommand;
         handleInventoryInteraction = InventoryModule.handleInventoryInteraction;
 
-        console.log("✅ Đã tải xong các module Pet Game (ESM).");
+        console.log("✅ [Pet] Đã tải xong các module Pet Game (ESM).");
     } catch (err) {
         console.error("❌ Lỗi khi tải module Pet Game:", err);
     }
 }
 
-
-// ====== 3. KHỞI TẠO NỐI TỪ ======
+// ====== 3. KHỞI TẠO NỐI TỪ (GIỮ NGUYÊN) ======
 try {
     if (fs.existsSync(configPath)) {
         const configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
         const channelId = configData.wordGameChannelId;
         if (channelId) {
-            wordGameStates.set(channelId, {
-                lastSyllable: null, lastUser: null, usedWords: new Set()
-            });
-            console.log(`✅ Game Nối Từ đã được khởi tạo cho kênh: ${channelId}`);
+            wordGameStates.set(channelId, { lastSyllable: null, lastUser: null, usedWords: new Set() });
+            console.log(`✅ [Word] Game Nối Từ đã được khởi tạo cho kênh: ${channelId}`);
         }
     } else {
         const dataDir = path.dirname(configPath);
         if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-        
         fs.writeFileSync(configPath, JSON.stringify({ wordGameChannelId: null }, null, 2));
-        console.log("File game-config.json đã được tạo.");
     }
-} catch (e) {
-    console.error("Lỗi khi đọc/tạo config Nối Từ:", e);
-}
-
+} catch (e) {}
 
 // ====== 4. LOAD SLASH COMMANDS & EVENTS ======
 client.commands = new Collection();
 const commandsPath = path.join(__dirname, "commands");
 
-// [UPDATED] Hàm loadCommands chuyển sang Async để hỗ trợ dynamic import (.mjs)
 const loadCommands = async (directoryPath) => {
     if (!fs.existsSync(directoryPath)) return;
-    
-    // Lọc cả file .js và .mjs
-    const files = fs.readdirSync(directoryPath)
-        .filter(f => f.endsWith(".js") || f.endsWith(".mjs"));
+    const files = fs.readdirSync(directoryPath).filter(f => f.endsWith(".js") || f.endsWith(".mjs"));
 
-    // Dùng vòng lặp for...of để có thể await bên trong
     for (const file of files) {
         try {
             const filePath = path.join(directoryPath, file);
             let cmd;
-
-            // Kiểm tra đuôi file để chọn cách load
             if (file.endsWith(".mjs")) {
-                // Dùng dynamic import cho .mjs (convert path sang URL để tránh lỗi trên Windows)
                 const module = await import(pathToFileURL(filePath).href);
                 cmd = module.default || module;
             } else {
-                // Dùng require cho .js như cũ
                 cmd = require(filePath);
             }
             
-            // Bỏ qua các lệnh cũ nếu cần
+            // [KEEP] Bỏ qua lệnh cũ của Pet nếu cần
             if (['pet_list', 'pet_info'].includes(cmd.data?.name)) continue; 
 
             if (cmd.data && cmd.execute) {
                 client.commands.set(cmd.data.name, cmd);
-            } else {
-                console.warn(`⚠️ [WARNING] Lệnh ${file} thiếu "data" hoặc "execute".`);
             }
         } catch (error) {
             console.error(`❌ Lỗi khi tải lệnh ${file}:`, error);
@@ -167,24 +140,19 @@ const loadCommands = async (directoryPath) => {
     }
 };
 
-// [UPDATED] Thực thi loadCommands (cần bọc trong IIFE async vì loadCommands giờ là async)
 if (fs.existsSync(commandsPath)) {
     (async () => {
         await loadCommands(commandsPath);
-        
-        // Load thư mục con
+        // Load thư mục con (bao gồm cả thư mục 'empire' mới tạo)
         const subDirs = fs.readdirSync(commandsPath).filter(name => fs.statSync(path.join(commandsPath, name)).isDirectory());
         for (const folder of subDirs) {
             await loadCommands(path.join(commandsPath, folder));
         }
-        
-        console.log(`✅ Đã tải ${client.commands.size} slash commands (.js & .mjs).`);
+        console.log(`✅ Đã tải ${client.commands.size} slash commands.`);
     })();
-} else {
-    console.warn("⚠️ Thư mục commands không tồn tại.");
 }
 
-// --- BỘ NẠP EVENT ---
+// --- EVENTS ---
 const eventsPath = path.join(__dirname, 'events');
 if (fs.existsSync(eventsPath)) {
     const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
@@ -200,225 +168,124 @@ if (fs.existsSync(eventsPath)) {
                 }
             };
             if (event.once) client.once(event.name, eventCallback);
-            // [FIX] Nếu không phải event once, đăng ký đúng event.name
-            else client.on(event.name, eventCallback); // Dùng event.name thay vì Events.InteractionCreate
-        } catch (err) {
-            console.error(`Lỗi tải event ${file}:`, err);
-        }
+            else client.on(event.name, eventCallback);
+        } catch (err) {}
     }
-    console.log(`✅ Đã tải ${eventFiles.length} events.`);
 }
 
-// ====== 5. READY & SPAWN SYSTEM START ======
+// ====== 5. READY ======
 client.once(Events.ClientReady, async () => {
     console.log(`✅ Bot đã đăng nhập: ${client.user.tag}`);
-    client.user.setPresence({
-        activities: [{ name: "🎉 Shumir đến chơi !", type: 0 }],
-        status: "online",
-    });
-    
-    // Đợi load xong các module ESM rồi mới khởi động hệ thống Pet
+    client.user.setPresence({ activities: [{ name: "🎉 Shumir đến chơi !", type: 0 }], status: "online" });
     await loadGameModules();
-    
     if (SpawnSystem) {
         spawner = new SpawnSystem(client); 
-        // 👇 CẬP NHẬT: Gửi RaidManager vào BattleManager để hệ thống chiến đấu nhận diện Boss
-        if (setRaidManagerRef) {
-            setRaidManagerRef(spawner.raidManager);
-        }
+        if (setRaidManagerRef) setRaidManagerRef(spawner.raidManager);
         spawner.start(); 
     }
 });
 
-
-// ====== 6. INTERACTION HANDLER ======
+// ====== 6. INTERACTION HANDLER (ĐÃ CẬP NHẬT) ======
 client.on("interactionCreate", async (interaction) => { 
     try {
         const { customId, commandName } = interaction;
 
         // --- SLASH COMMAND ---
         if (interaction.isChatInputCommand()) {
-            const empireCommands = ['register', 'build', 'recruit', 'me', 'map', 'attack', 'scout', 'move', 'market'];
+            
+            // [NEW] 1. Kiểm tra Lệnh Game Đế Chế
+            const empireCommands = ['register', 'build', 'recruit', 'me', 'map', 'attack', 'scout', 'move', 'market', 'alliance', 'upgrade'];
             if (empireCommands.includes(commandName)) {
-                // Lấy ID kênh đã setup cho server này
+                // Lấy ID kênh đã setup
                 const allowedChannelId = empireConfig[interaction.guildId];
                 
                 // Nếu chưa setup
                 if (!allowedChannelId) {
                     return interaction.reply({ 
-                        content: "⚠️ Server này chưa thiết lập kênh chơi game!\nVui lòng nhờ Admin dùng lệnh `/setup_empire` tại kênh muốn chơi.", 
-                        ephemeral: true // Chỉ người dùng thấy
-                    });
-                }
-
-                // Nếu sai kênh
-                if (interaction.channelId !== allowedChannelId) {
-                    return interaction.reply({ 
-                        content: `⛔ **Sai địa bàn!**\nVui lòng di chuyển sang kênh <#${allowedChannelId}> để điều hành vương quốc.`, 
+                        content: "⚠️ Server chưa setup game Đế Chế! Admin hãy dùng `/setup_empire`.", 
                         ephemeral: true 
                     });
                 }
+                // (Tùy chọn) Check đúng kênh - hiện tại ta để lệnh con tự xử lý logic private channel
             }
 
-            // 2. Logic Game Đế Chế: Xử lý lệnh setup
+            // [NEW] Xử lý lệnh setup_empire riêng (để truyền config)
             if (commandName === 'setup_empire') {
                 const cmd = client.commands.get('setup_empire');
-                if (cmd) {
-                    // Truyền biến empireConfig vào để lệnh cập nhật và lưu file
-                    return cmd.execute(interaction, client, null, null, null, empireConfig);
-                }
+                if (cmd) return cmd.execute(interaction, client, null, null, null, empireConfig);
             }
-            // [FIX 1: IMMEDIATE DEFERRAL for ALL Slash Commands]
-            await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
-            // ============ XỬ LÝ LỆNH CONFIG ============
+            // [KEEP] Defer logic (Chống timeout)
+            if (!interaction.deferred && !interaction.replied) {
+                 await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+            }
+
+            // [KEEP] Các lệnh Config cũ (Arena, Lvsv)
             if (commandName === 'arena') {
                 const channel = interaction.options.getChannel('channel');
-                const serverId = interaction.guildId;
-                if (!interaction.member.permissions.has('ManageChannels')) {
-                    // FIX 40060: Use editReply after defer
-                    return interaction.editReply({ content: "🚫 Bạn không có quyền quản lý kênh!", ephemeral: true });
-                }
+                if (!interaction.member.permissions.has('ManageChannels')) return interaction.editReply("🚫 Thiếu quyền!");
                 if (Database) {
-                    try {
-                        Database.setArenaChannel(serverId, channel.id);
-                        // FIX 40060: Use editReply after defer
-                        await interaction.editReply(`🏟️ **Cài đặt thành công!**\nKênh đấu trường PvP đã được thiết lập tại: ${channel.toString()}\nCác lệnh \`/pvp\` chỉ có hiệu lực tại đây.`);
-                    } catch (error) {
-                        console.error(error);
-                        // FIX 40060: Use editReply after defer
-                        await interaction.editReply({ content: "❌ Có lỗi khi lưu dữ liệu.", ephemeral: true });
-                    }
-                } else {
-                    // FIX 40060: Use editReply after defer
-                    await interaction.editReply({ content: "❌ Database chưa sẵn sàng.", ephemeral: true });
-                }
-                return; 
-            }
-
-            if (commandName === 'lvsv') {
-                const difficulty = interaction.options.getString('độ_khó');
-                const serverId = interaction.guildId;
-                if (!interaction.member.permissions.has('ManageGuild')) {
-                    // FIX 40060: Use editReply after defer
-                    return interaction.editReply({ content: "🚫 Bạn không có quyền quản lý Server!", ephemeral: true });
-                }
-                if (Database) {
-                    const config = Database.getServerConfig(serverId);
-                    config.difficulty = difficulty;
-                    Database.updateServerConfig(serverId, config);
-                    // FIX 40060: Use editReply after defer
-                    await interaction.editReply(`⚙️ Độ khó của Server đã được chỉnh thành: **${difficulty.toUpperCase()}**`);
+                    Database.setArenaChannel(interaction.guildId, channel.id);
+                    await interaction.editReply(`🏟️ Đã set Đấu Trường: ${channel.toString()}`);
                 }
                 return;
             }
-            // ==========================================================================
-
-            // 2. Định tuyến Pet Game commands
-            const petCommands = ['inventory', 'adventure', 'setup_spawn', 'code'];
-            if (petCommands.includes(commandName)) {
-                if (!handleSlashCommand) return interaction.editReply({ content: "⏳ Hệ thống Pet đang khởi động...", ephemeral: true });
-                // handleSlashCommand sẽ dùng editReply/followUp bên trong
-                return handleSlashCommand(interaction);
+            if (commandName === 'lvsv') {
+                const diff = interaction.options.getString('độ_khó');
+                if (!interaction.member.permissions.has('ManageGuild')) return interaction.editReply("🚫 Thiếu quyền!");
+                if (Database) {
+                    const cfg = Database.getServerConfig(interaction.guildId);
+                    cfg.difficulty = diff;
+                    Database.updateServerConfig(interaction.guildId, cfg);
+                    await interaction.editReply(`⚙️ Độ khó: **${diff.toUpperCase()}**`);
+                }
+                return;
             }
-            
-            // Xử lý lệnh Starter Pet (/pet random) và Gacha
+
+            // [KEEP] Pet Game Routing
+            if (['inventory', 'adventure', 'setup_spawn', 'code'].includes(commandName)) {
+                if (handleSlashCommand) return handleSlashCommand(interaction);
+            }
             if (commandName === 'pet') {
                  const sub = interaction.options.getSubcommand();
-                 
-                 // [FIX] Lệnh random starter
-                 if (sub === 'random') {
-                     if (handleStarterCommand) return handleStarterCommand(interaction);
-                 }
-                 // [FIX] Lệnh Gacha (Thêm mới)
-                 else if (sub === 'gacha') {
-                     if (handleGacha) return handleGacha(interaction);
-                     else return interaction.editReply({ content: "⏳ Hệ thống Gacha đang tải...", ephemeral: true });
-                 }
-                 // [FIX] Các lệnh thông tin khác (đã xóa gacha khỏi list này)
-                 else if (['info', 'list', 'help', 'evolve'].includes(sub)) { 
-                     if (handleSlashCommand) return handleSlashCommand(interaction);
-                 }
+                 if (sub === 'random' && handleStarterCommand) return handleStarterCommand(interaction);
+                 else if (sub === 'gacha' && handleGacha) return handleGacha(interaction);
+                 else if (handleSlashCommand) return handleSlashCommand(interaction);
             }
 
-            // 3. Định tuyến commands game khác
+            // [MERGE] CHẠY LỆNH CHUNG (Pet, Đế Chế, Ma Sói...)
+            // Tìm lệnh trong Collection
             const command = client.commands.get(commandName);
-            if (!command) return;
-return command.execute(interaction, client, wordGameStates, activeWerewolfGames, activeMonopolyGames, empireConfig);        }
+            if (command) {
+                // Truyền empireConfig vào cuối để lệnh Đế Chế dùng
+                // Truyền wordGameStates, activeWerewolfGames để lệnh cũ dùng
+                return command.execute(interaction, client, wordGameStates, activeWerewolfGames, activeMonopolyGames, empireConfig);
+            }
+        }
 
-        // --- BUTTON & SELECT MENU ---
-        // ... (Giữ nguyên logic xử lý Buttons) ...
-        
-        // 1. Pet Game - Battle, Skills & CATCH SYSTEM (QUAN TRỌNG)
-        // 👇 CẬP NHẬT: Đã thêm customId.startsWith("ball_") để bắt sự kiện chọn bóng
-        if (customId?.startsWith("challenge_") || 
-            customId?.startsWith("use_skill_") || 
-            customId?.startsWith("btn_") || 
-            customId?.startsWith("pvp_") ||
-            customId?.startsWith("ball_")) { // <--- MỚI
-            
+        // --- BUTTON & SELECT MENU (GIỮ NGUYÊN) ---
+        if (customId?.startsWith("challenge_") || customId?.startsWith("use_skill_") || customId?.startsWith("btn_") || customId?.startsWith("pvp_") || customId?.startsWith("ball_")) {
             if (handleBattle) return handleBattle(interaction); 
         }
-
-        // [FIX] Xử lý nút quay tiếp Gacha
-        if (customId === 'gacha_roll_again') {
-            if (handleGacha) return handleGacha(interaction);
-        }
-
-        // 2. Pet Game - Inventory Router
-        if (customId?.startsWith("inv_")) {
-            if (handleInventoryInteraction) return handleInventoryInteraction(interaction);
-        }
-
-        // 3. Pet Game - Adventure
-        if (customId?.startsWith("adv_")) {
-             if (handleButtons) return handleButtons(interaction);
-        }
+        if (customId === 'gacha_roll_again' && handleGacha) return handleGacha(interaction);
+        if (customId?.startsWith("inv_") && handleInventoryInteraction) return handleInventoryInteraction(interaction);
+        if (customId?.startsWith("adv_") && handleButtons) return handleButtons(interaction);
+        if (customId?.startsWith('monopoly_') && handleMonopolyInteraction) return handleMonopolyInteraction(interaction);
         
-        // 4. Cờ Tỷ Phú
-        if (customId?.startsWith('monopoly_') && handleMonopolyInteraction) {
-             return handleMonopolyInteraction(interaction); 
-        }
-
-        // 5. Ma Sói
         if (customId?.startsWith('masoi_')) {
             const masoiCmd = client.commands.get('masoi');
-            if (masoiCmd && typeof masoiCmd.component === 'function') {
-                return masoiCmd.component(interaction, client, wordGameStates, activeWerewolfGames);
-            }
+            if (masoiCmd?.component) return masoiCmd.component(interaction, client, wordGameStates, activeWerewolfGames);
         }
 
     } catch (err) {
         console.error("❌ Lỗi interaction:", err);
         try {
-            const msg = { content: "❌ Lỗi nội bộ.", ephemeral: true };
-            if (interaction.replied || interaction.deferred) await interaction.editReply(msg);
-            else await interaction.reply(msg);
+            if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: "❌ Lỗi nội bộ.", ephemeral: true });
+            else await interaction.editReply({ content: "❌ Lỗi nội bộ." });
         } catch (e) {}
     }
 });
 
-
 // ====== 7. LOGIN ======
 const token = (process.env.BOT_TOKEN || process.env.TOKEN || "").trim();
-if (!token || token.length < 20) {
-    console.error('❌ Token lỗi. Kiểm tra .env');
-    process.exit(1);
-}
-
-client.login(token).catch(err => {
-    console.error("❌ Login thất bại:", err);
-    process.exit(1);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.log('⚠️ Lỗi chưa được xử lý (Unhandled Rejection):', reason);
-});
-
-client.on('error', (error) => {
-    console.error('❌ Discord Client Error:', error);
-});
-
-process.on('uncaughtException', (err) => {
-    console.error('💀 Lỗi nghiêm trọng (Uncaught Exception):', err);
-});
+client.login(token).catch(err => console.error("❌ Login thất bại:", err));

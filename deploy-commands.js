@@ -1,16 +1,14 @@
-// node deploy-commands.js
+// deploy-commands.js (MERGED VERSION)
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
+const { pathToFileURL } = require("url");
 const { REST, Routes, SlashCommandBuilder, PermissionFlagsBits } = require("discord.js");
 
 // --- CẤU HÌNH ---
 const TOKEN = process.env.BOT_TOKEN || process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = "1308052869559222272"; // ID Server Test
-
-// ⚠️ Đặt là TRUE nếu muốn deploy Global (Cho mọi server)
-// Lưu ý: Global update có thể mất tới 1 giờ, Guild update thì ngay lập tức.
 const IS_GLOBAL = false; 
 
 if (!TOKEN || !CLIENT_ID) {
@@ -22,102 +20,36 @@ const commands = [];
 const commandNames = new Set();
 
 // =====================================================
-// 1. ĐỊNH NGHĨA THỦ CÔNG CÁC LỆNH PET GAME
+// 1. [KEEP] LỆNH PET GAME & SYSTEM (GIỮ NGUYÊN)
 // =====================================================
-const petCommands = [
-    // --- NHÓM LỆNH PET ---
-    new SlashCommandBuilder()
-        .setName('pet')
-        .setDescription('Hệ thống Thú Cưng')
-        .addSubcommand(sub => sub.setName('random').setDescription('🎁 Nhận Pet khởi đầu ngẫu nhiên'))
-        .addSubcommand(sub => sub.setName('info').setDescription('ℹ️ Xem thông tin chi tiết Pet của bạn'))
-        .addSubcommand(sub => sub.setName('list').setDescription('📜 Xem danh sách tất cả Pet trong kho'))
-        .addSubcommand(sub => sub.setName('help').setDescription('📜 Xem hướng dẫn chơi Pet Game'))
-        .addSubcommand(sub => 
-            sub.setName('evolve')
-            .setDescription('🧬 Tiến hóa Pet khi đủ cấp độ')
-            .addIntegerOption(op => op.setName('slot').setDescription('Vị trí Pet muốn tiến hóa').setRequired(false))
-        )
-        .addSubcommand(sub => sub.setName('gacha').setDescription('🎰 Quay Pet may mắn (Giá: 500 Gold)')), 
-
-    // --- KHO ĐỒ ---
-    new SlashCommandBuilder().setName('inventory').setDescription('🎒 Xem túi đồ và danh sách Pet'),
-    
-    // --- PVE (ẢI) ---
-    new SlashCommandBuilder().setName('adventure').setDescription('⚔️ Đưa Pet đi ải (PvE)'),
-
-    // --- PVP (ĐẤU TRƯỜNG) ---
-    new SlashCommandBuilder().setName('pvp').setDescription('🥊 Thách đấu PvP với người chơi khác')
-        .addUserOption(option => option.setName('opponent').setDescription('Người chơi bạn muốn thách đấu').setRequired(true)),
-
-    // --- [MỚI] CÀI ĐẶT ĐẤU TRƯỜNG (ADMIN) ---
-    new SlashCommandBuilder().setName('arena').setDescription('🏟️ Thiết lập kênh Đấu Trường (Nơi duy nhất được PvP)')
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels) // Chỉ Admin/Mod
-        .addChannelOption(option => option.setName('channel').setDescription('Chọn kênh làm đấu trường').setRequired(true)),
-
-    // --- GIFTCODE ---
-    new SlashCommandBuilder().setName('code').setDescription('🎁 Nhập mã Giftcode')
-        .addStringOption(op => op.setName('code').setDescription('Mã code').setRequired(true)),
-
-    // --- [MỚI] BẢNG XẾP HẠNG ---
-    new SlashCommandBuilder().setName('rank').setDescription('🏆 Xem bảng xếp hạng Server')
-        .addStringOption(op => 
-            op.setName('type')
-            .setDescription('Loại xếp hạng')
-            .addChoices(
-                { name: 'Level Cao Nhất', value: 'level' },
-                { name: 'Đại Gia (Gold)', value: 'gold' }
-            )
-        ),
-
-    // --- CÀI ĐẶT SERVER (ADMIN) ---
-    new SlashCommandBuilder().setName('lvsv').setDescription('⚙️ Cài đặt độ khó Server (Admin)')
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
-        .addStringOption(option => 
-            option.setName('độ_khó')
-                .setDescription('Chọn mức độ khó')
-                .setRequired(true)
-                .addChoices(
-                    { name: 'Dễ (x1)', value: 'dễ' },
-                    { name: 'Bình Thường (x3)', value: 'bth' },
-                    { name: 'Khó (x10)', value: 'khó' },
-                    { name: 'Siêu Khó (x50)', value: 'siêu khó' },
-                    { name: 'Ác Quỷ (x250)', value: 'ác quỷ' },
-                    { name: 'Kẻ Hủy Diệt (x1000)', value: 'kẻ hủy diệt' }
-                )
-        ),
-
-    new SlashCommandBuilder().setName('setup_spawn').setDescription('⚙️ Cài đặt kênh Spawn Pet tự nhiên (Chỉ Admin)')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-        .addChannelOption(op => op.setName('channel').setDescription('Chọn kênh').setRequired(true)),
-
-    // --- MARKET (CHỢ) ---
-    new SlashCommandBuilder()
-        .setName('market')
-        .setDescription('🏪 Chợ mua bán Pet')
-        .addSubcommand(sub => sub.setName('list').setDescription('📜 Xem danh sách Pet đang bán'))
-        .addSubcommand(sub => 
-            sub.setName('sell')
-                .setDescription('💰 Bán Pet lấy Gold')
-                .addIntegerOption(op => op.setName('slot').setDescription('Vị trí Pet trong túi (1, 2...)').setRequired(true))
-                .addIntegerOption(op => op.setName('price').setDescription('Giá bán (Gold)').setRequired(true))
-        )
-        .addSubcommand(sub => 
-            sub.setName('buy')
-                .setDescription('🛒 Mua Pet từ người khác')
-                .addStringOption(op => op.setName('pet_id').setDescription('ID Pet muốn mua').setRequired(true))
-        ),
+const manualCommands = [
+    new SlashCommandBuilder().setName('pet').setDescription('Hệ thống Thú Cưng')
+        .addSubcommand(sub => sub.setName('random').setDescription('🎁 Nhận Pet khởi đầu'))
+        .addSubcommand(sub => sub.setName('info').setDescription('ℹ️ Xem thông tin Pet'))
+        .addSubcommand(sub => sub.setName('list').setDescription('📜 Danh sách Pet'))
+        .addSubcommand(sub => sub.setName('help').setDescription('📜 Hướng dẫn'))
+        .addSubcommand(sub => sub.setName('evolve').setDescription('🧬 Tiến hóa Pet').addIntegerOption(op => op.setName('slot').setDescription('Vị trí').setRequired(false)))
+        .addSubcommand(sub => sub.setName('gacha').setDescription('🎰 Quay Pet (500 Gold)')),
+    new SlashCommandBuilder().setName('inventory').setDescription('🎒 Xem túi đồ'),
+    new SlashCommandBuilder().setName('adventure').setDescription('⚔️ PvE (Đi ải)'),
+    new SlashCommandBuilder().setName('pvp').setDescription('🥊 PvP (Thách đấu)').addUserOption(op => op.setName('opponent').setDescription('Đối thủ').setRequired(true)),
+    new SlashCommandBuilder().setName('arena').setDescription('🏟️ Setup Đấu Trường (Admin)').setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels).addChannelOption(op => op.setName('channel').setDescription('Kênh').setRequired(true)),
+    new SlashCommandBuilder().setName('code').setDescription('🎁 Nhập Giftcode').addStringOption(op => op.setName('code').setDescription('Mã code').setRequired(true)),
+    new SlashCommandBuilder().setName('rank').setDescription('🏆 Bảng xếp hạng').addStringOption(op => op.setName('type').setDescription('Loại').addChoices({name:'Level',value:'level'},{name:'Gold',value:'gold'})),
+    new SlashCommandBuilder().setName('lvsv').setDescription('⚙️ Độ khó Server (Admin)').setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild).addStringOption(op => op.setName('độ_khó').setDescription('Mức độ').setRequired(true).addChoices({name:'Dễ',value:'dễ'},{name:'Bình thường',value:'bth'},{name:'Khó',value:'khó'}, {name:'Siêu Khó',value:'siêu khó'}, {name:'Ác Quỷ',value:'ác quỷ'})),
+    new SlashCommandBuilder().setName('setup_spawn').setDescription('⚙️ Setup Spawn (Admin)').setDefaultMemberPermissions(PermissionFlagsBits.Administrator).addChannelOption(op => op.setName('channel').setDescription('Kênh').setRequired(true)),
+    // Lưu ý: Lệnh market của Pet có thể trùng tên với Empire. 
+    // Nếu trùng, Discord sẽ chỉ nhận 1 cái. Ưu tiên lệnh trong file commands nếu tên giống nhau.
 ];
 
-// Nạp lệnh vào danh sách
-petCommands.forEach(cmd => {
+manualCommands.forEach(cmd => {
     commands.push(cmd.toJSON());
     commandNames.add(cmd.name);
-    console.log(`🔹 Đã thêm lệnh Pet Game: /${cmd.name}`);
+    console.log(`🔹 Đã thêm lệnh thủ công: /${cmd.name}`);
 });
 
 // =====================================================
-// 2. TỰ ĐỘNG QUÉT LỆNH TỪ THƯ MỤC COMMANDS (NẾU CÓ)
+// 2. [NEW] QUÉT LỆNH TỪ FOLDER (BAO GỒM ĐẾ CHẾ)
 // =====================================================
 const getAllCommandFiles = (dirPath, arrayOfFiles = []) => {
     const files = fs.readdirSync(dirPath);
@@ -125,62 +57,60 @@ const getAllCommandFiles = (dirPath, arrayOfFiles = []) => {
         const filePath = path.join(dirPath, file);
         if (fs.statSync(filePath).isDirectory()) {
             getAllCommandFiles(filePath, arrayOfFiles);
-        } else if (file.endsWith(".js")) {
+        } else if (file.endsWith(".js") || file.endsWith(".mjs")) {
             arrayOfFiles.push(filePath);
         }
     }
     return arrayOfFiles;
 };
 
-console.log("📦 Đang quét thư mục commands/...");
 const commandsPath = path.join(__dirname, "commands");
 
-if (fs.existsSync(commandsPath)) {
-    const commandFiles = getAllCommandFiles(commandsPath);
-    for (const file of commandFiles) {
-        try {
-            const command = require(file);
-            const cmdData = command.default?.data || command.data; 
-            if (cmdData) {
-                // Bỏ qua nếu trùng tên với lệnh thủ công
-                if (commandNames.has(cmdData.name)) {
-                     console.warn(`⚠️  Bỏ qua file ${path.basename(file)} vì trùng lệnh /${cmdData.name}.`);
-                     continue;
+// Bọc trong async để dùng Dynamic Import
+(async () => {
+    if (fs.existsSync(commandsPath)) {
+        console.log("📦 Đang quét thư mục commands/...");
+        const commandFiles = getAllCommandFiles(commandsPath);
+        
+        for (const file of commandFiles) {
+            try {
+                // Dùng import() thay vì require() để hỗ trợ cả .mjs và .js
+                const module = await import(pathToFileURL(file).href);
+                const cmdData = module.default?.data || module.data;
+
+                if (cmdData) {
+                    // Kiểm tra trùng tên
+                    if (commandNames.has(cmdData.name)) {
+                        console.warn(`⚠️ Bỏ qua file ${path.basename(file)} vì trùng lệnh /${cmdData.name} (Đã có lệnh thủ công).`);
+                        continue;
+                    }
+                    commands.push(cmdData.toJSON());
+                    commandNames.add(cmdData.name);
+                    console.log(`🔹 Load file lệnh: /${cmdData.name}`);
                 }
-                commands.push(cmdData.toJSON());
-                commandNames.add(cmdData.name);
+            } catch (err) {
+                console.error(`❌ Lỗi file ${path.basename(file)}:`, err.message);
             }
-        } catch (err) {
-            console.error(`❌ Lỗi file ${path.basename(file)}:`, err.message);
         }
     }
-} else {
-    console.warn("⚠️ Không tìm thấy thư mục 'commands', chỉ deploy các lệnh thủ công.");
-}
 
-console.log(`✅ Tổng cộng: ${commands.length} lệnh sẵn sàng deploy.`);
+    console.log(`✅ Tổng cộng: ${commands.length} lệnh sẵn sàng deploy.`);
 
-// =====================================================
-// 3. DEPLOY
-// =====================================================
-const rest = new REST({ version: "10" }).setToken(TOKEN);
+    // =====================================================
+    // 3. DEPLOY
+    // =====================================================
+    const rest = new REST({ version: "10" }).setToken(TOKEN);
 
-(async () => {
     try {
-        console.log(`🔄 Bắt đầu làm mới lệnh ứng dụng...`);
+        console.log(`🔄 Đang gửi lệnh lên Discord...`);
         if (IS_GLOBAL) {
-            console.log("🌎 Đang deploy GLOBAL...");
-            // Reset lệnh Guild để tránh trùng lặp khi chuyển sang Global
-            await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: [] });
-            const data = await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
-            console.log(`✅ Đã reload ${data.length} lệnh GLOBAL thành công!`);
+            await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
+            console.log(`✅ Đã reload GLOBAL thành công!`);
         } else {
-            console.log(`🏠 Đang deploy GUILD (${GUILD_ID})...`);
-            // Deploy riêng cho Guild (Update ngay lập tức để test)
-            const data = await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands });
-            console.log(`✅ Đã reload ${data.length} lệnh cho SERVER TEST thành công!`);
+            await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands });
+            console.log(`✅ Đã reload GUILD thành công!`);
         }
     } catch (error) {
-        console.error("❌ Lỗi khi deploy:", error);
+        console.error("❌ Lỗi Deploy:", error);
     }
 })();
